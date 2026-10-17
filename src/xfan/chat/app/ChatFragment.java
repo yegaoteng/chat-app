@@ -574,17 +574,8 @@ public class ChatFragment extends Fragment {
                         }
 
                         collect(r.optJSONArray("items"), urls, names, keys);
-                        JSONArray flat = r.optJSONArray("items");
-                        if (flat != null) {
-                            for (int j = 0; j < flat.length(); j++) {
-                                JSONObject it = flat.optJSONObject(j);
-                                if (it == null) continue;
-                                String u = it.optString("url", "");
-                                if (u.isEmpty()) continue;
-                                urls.add(u);
-                                names.add(it.optString("name", "图片"));
-                            }
-                        }
+                        // 注意：上面 collect 已经处理过 items 了，
+                        // 这里不能再遍历一遍，否则每张图都会重复出现两次。
                         if (urls.isEmpty()) { toast("还没有上传记录"); return; }
 
                         // 带缩略图的网格，点一下直接发送
@@ -595,6 +586,9 @@ public class ChatFragment extends Fragment {
                         for (int i = 0; i < urls.size(); i++) {
                             final String u = urls.get(i);
                             final String nm = names.get(i);
+                            // i 在循环里会自增，不是 effectively final，
+                            // 匿名内部类里直接用会编译失败，这里复制一份 final 的
+                            final String ky = (i < keys.size()) ? keys.get(i) : "";
                             LinearLayout row = new LinearLayout(getActivity());
                             row.setOrientation(LinearLayout.HORIZONTAL);
                             row.setGravity(Gravity.CENTER_VERTICAL);
@@ -643,7 +637,7 @@ public class ChatFragment extends Fragment {
                             del.setPadding(0, 4, 0, 4);
                             del.setOnClickListener(new View.OnClickListener() {
                                 public void onClick(View v) {
-                                    confirmDeleteUpload(nm, keys.get(i));
+                                    confirmDeleteUpload(nm, ky);
                                 }
                             });
 
