@@ -32,7 +32,7 @@ public class Api {
     public static final boolean USE_GET_ONLY = true;
 
     // 服务器地址写死在源码里，登录页不再让用户输入
-    public static final String SERVER = "https://ffurry.hyperphp.com/chat/appapi.php";
+    public static final String SERVER = "https://f.ffurry.cc.cd/chat/appapi.php";
 
     public static String base() {
         String s = SERVER;
