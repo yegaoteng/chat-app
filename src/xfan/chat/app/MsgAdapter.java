@@ -37,11 +37,18 @@ public class MsgAdapter extends BaseAdapter {
         void onLongClick(int pos);
     }
 
+    /** 点击头像 -> 查看该用户资料 */
+    public interface OnAvatarClick {
+        void onAvatar(String username);
+    }
+
     private OnImageClick imageClick;
     private OnItemLongClick longClick;
+    private OnAvatarClick avatarClick;
 
     public void setOnImageClick(OnImageClick l) { imageClick = l; }
     public void setOnItemLongClick(OnItemLongClick l) { longClick = l; }
+    public void setOnAvatarClick(OnAvatarClick l) { avatarClick = l; }
 
     public MsgAdapter(Context c, List<Models.Msg> d) {
         ctx = c;
@@ -137,6 +144,13 @@ public class MsgAdapter extends BaseAdapter {
         // ---- 头像：自己也显示（放右侧）----
         ImageView av = self ? vh.avRight : vh.avLeft;
         loadAvatar(av, m.username, m.avatar);
+        // 点头像 -> 查看资料（自己也一样，方便核对自己的 UID / 积分）
+        final String who = m.username;
+        av.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (avatarClick != null) avatarClick.onAvatar(who);
+            }
+        });
 
         // ---- 名称：用发送者的个性化颜色 ----
         vh.name.setText(m.username);

@@ -116,6 +116,15 @@ public class FriendsFragment extends Fragment {
                 } else {
                     av.setImageDrawable(new Avatars(f.username));
                 }
+                // 点头像 -> 看资料（点整行才是进私聊）
+                final String who = f.username;
+                av.setOnClickListener(new View.OnClickListener() {
+                    public void onClick(View v) {
+                        if (host != null && host.fChat != null) {
+                            UserInfoDialog.show(host.fChat, who);
+                        }
+                    }
+                });
                 // 关键：用好友自己的名称颜色，不能用「我」的。
                 // 之前传 null 会套用我的个性化，导致：
                 //   1) 别人看我时显示成他自己的颜色

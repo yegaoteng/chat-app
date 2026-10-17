@@ -87,6 +87,9 @@ public class ChatFragment extends Fragment {
         ad.setOnImageClick(new MsgAdapter.OnImageClick() {
             public void onImage(String content) { openImage(content); }
         });
+        ad.setOnAvatarClick(new MsgAdapter.OnAvatarClick() {
+            public void onAvatar(String username) { UserInfoDialog.show(ChatFragment.this, username); }
+        });
         // 图片消息的长按由 adapter 转发（图片可点击后 ListView 收不到长按）
         ad.setOnItemLongClick(new MsgAdapter.OnItemLongClick() {
             public void onLongClick(int pos) {
@@ -549,13 +552,16 @@ public class ChatFragment extends Fragment {
                         // groups_list（数组，App 首选）/ groups（对象，网页端格式）/ items（扁平）
                         final List<String> urls = new ArrayList<String>();
                         final List<String> names = new ArrayList<String>();
+                        // key 是服务端落盘的唯一文件名。两张同名图靠它区分，
+                        // 删除必须用它，否则会删错。
+                        final List<String> keys = new ArrayList<String>();
 
                         JSONArray gl = r.optJSONArray("groups_list");
                         if (gl != null) {
                             for (int i = 0; i < gl.length(); i++) {
                                 JSONObject day = gl.optJSONObject(i);
                                 if (day == null) continue;
-                                collect(day.optJSONArray("items"), urls, names);
+                                collect(day.optJSONArray("items"), urls, names, keys);
                             }
                         }
 
@@ -563,11 +569,11 @@ public class ChatFragment extends Fragment {
                         if (go != null) {
                             java.util.Iterator<String> it = go.keys();
                             while (it.hasNext()) {
-                                collect(go.optJSONArray(it.next()), urls, names);
+                                collect(go.optJSONArray(it.next()), urls, names, keys);
                             }
                         }
 
-                        collect(r.optJSONArray("items"), urls, names);
+                        collect(r.optJSONArray("items"), urls, names, keys);
                         JSONArray flat = r.optJSONArray("items");
                         if (flat != null) {
                             for (int j = 0; j < flat.length(); j++) {
@@ -636,7 +642,9 @@ public class ChatFragment extends Fragment {
                             del.setTextSize(12);
                             del.setPadding(0, 4, 0, 4);
                             del.setOnClickListener(new View.OnClickListener() {
-                                public void onClick(View v) { confirmDeleteUpload(nm); }
+                                public void onClick(View v) {
+                                    confirmDeleteUpload(nm, keys.get(i));
+                                }
                             });
 
                             ops.addView(send);
@@ -660,8 +668,9 @@ public class ChatFragment extends Fragment {
         }).start();
     }
 
-    /** 从 items 数组里收集图片 url 与名称 */
-    private void collect(JSONArray items, List<String> urls, List<String> names) {
+    /** 从 items 数组里收集 url / 显示名 / 唯一 key */
+    private void collect(JSONArray items, List<String> urls,
+                         List<String> names, List<String> keys) {
         if (items == null) return;
         for (int j = 0; j < items.length(); j++) {
             JSONObject it = items.optJSONObject(j);
@@ -671,28 +680,40 @@ public class ChatFragment extends Fragment {
             if (u.isEmpty()) continue;
             urls.add(u);
             names.add(it.optString("name", "图片"));
+            // 老服务端没有 key：用 url 的文件名兜底（同样是唯一的）
+            String k = it.optString("key", "");
+            if (k.isEmpty()) {
+                String p = u;
+                int slash = p.lastIndexOf('/');
+                k = slash >= 0 ? p.substring(slash + 1) : p;
+            }
+            keys.add(k);
         }
     }
 
-    /** 删除上传：返还该图片 50% 积分 */
-    private void confirmDeleteUpload(final String name) {
+    /** 删除上传：返还该图片 50% 积分。用 key 精确定位，避免删错同名图 */
+    private void confirmDeleteUpload(final String name, final String key) {
         if (getActivity() == null) return;
         new AlertDialog.Builder(getActivity())
                 .setTitle("删除这张图片？")
-                .setMessage("删除后将返还该图片消耗的 50% 积分，且无法恢复。")
+                .setMessage(name + "\n删除后将返还该图片消耗的 50% 积分，且无法恢复。")
                 .setNegativeButton("我再想想", null)
                 .setPositiveButton("确认删除", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) { doDeleteUpload(name); }
+                    public void onClick(DialogInterface d, int w) { doDeleteUpload(key, name); }
                 })
                 .show();
     }
 
-    private void doDeleteUpload(final String name) {
+    private void doDeleteUpload(final String key, final String name) {
         toast("删除中…");
         new Thread(new Runnable() {
             public void run() {
                 JSONObject b = new JSONObject();
-                try { b.put("name", name); } catch (Exception ignore) {}
+                try {
+                    // 优先传 key；服务端没有 key 的老数据会退回按 name 匹配
+                    if (key != null && !key.isEmpty()) b.put("key", key);
+                    else b.put("name", name);
+                } catch (Exception ignore) {}
                 final JSONObject r = Api.post("user.php?action=delete_upload", b);
                 ui(new Runnable() {
                     public void run() {
@@ -709,7 +730,7 @@ public class ChatFragment extends Fragment {
         }).start();
     }
 
-    private void openImage(String content) {
+    public void openImage(String content) {
         if (getActivity() == null || content == null || content.isEmpty()) return;
         startActivity(new Intent(getActivity(), ImageViewActivity.class)
                 .putExtra("url", Api.absUrl(content)));
@@ -832,7 +853,61 @@ public class ChatFragment extends Fragment {
         }
     }
 
-    private void toast(String s) {
+    /**
+     * 资料读取回调。
+     */
+    public interface UserInfoCb {
+        void onDone(JSONObject d);
+    }
+
+    /**
+     * 读取指定用户的资料（uid / 头像 / 简介 / 名称颜色 / 积分 / 在线）。
+     */
+    public void loadUserInfo(final String who, final UserInfoCb cb) {
+        new Thread(new Runnable() {
+            public void run() {
+                final JSONObject r = Api.get("user.php?action=user_info&username="
+                        + java.net.URLEncoder.encode(who == null ? "" : who));
+                ui(new Runnable() {
+                    public void run() {
+                        if (cb == null) return;
+                        if (r == null || !r.optBoolean("success", false)) { cb.onDone(null); return; }
+                        cb.onDone(r);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /**
+     * 发送好友申请。
+     */
+    public void sendFriendRequest(final String who) {
+        toast("发送中…");
+        new Thread(new Runnable() {
+            public void run() {
+                JSONObject b = new JSONObject();
+                try {
+                    b.put("username", who);
+                    // 服务端要求申请原因非空
+                    b.put("reason", "想加你为好友");
+                } catch (Exception ignore) {}
+                final JSONObject r = Api.post("user.php?action=send_request", b);
+                ui(new Runnable() {
+                    public void run() {
+                        if (r == null) { toast("发送失败"); return; }
+                        if (!r.optBoolean("success", false)) {
+                            toast(r.optString("error", "发送失败"));
+                            return;
+                        }
+                        toast("已发送好友申请");
+                    }
+                });
+            }
+        }).start();
+    }
+
+    public void toast(String s) {
         if (getActivity() == null) return;
         Toast.makeText(getActivity(), s, Toast.LENGTH_SHORT).show();
     }
