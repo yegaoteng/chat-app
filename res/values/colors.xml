@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#2B2B40</color>
+    <color name="primaryDark">#1B1B28</color>
+    <color name="accent">#667EEA</color>
+    <color name="accent2">#764BA2</color>
+
+    <color name="bg">#FFFFFF</color>
+    <color name="bg_panel">#F5F5F7</color>
+    <color name="bg_drawer">#232336</color>
+    <color name="bg_bubble_self">#667EEA</color>
+    <color name="bg_bubble_other">#ECECEF</color>
+
+    <color name="text">#222222</color>
+    <color name="text_sub">#8A8A94</color>
+    <color name="text_light">#FFFFFF</color>
+    <color name="text_drawer">#5FE3F0</color>
+
+    <color name="divider">#E3E3E8</color>
+    <color name="mask">#99000000</color>
+    <color name="danger">#E74C3C</color>
+    <color name="ok">#2E7D32</color>
+    <color name="gold">#E8B923</color>
+</resources>

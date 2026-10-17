@@ -1,0 +1,36 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "xfan.chat.app"
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "xfan.chat.app"
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 1
+        versionName "1.0"
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            res.srcDirs = ['res']
+        }
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+// 零第三方依赖：只用 Android SDK 自带 API 与系统 org.json
+dependencies {
+}

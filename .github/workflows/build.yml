@@ -1,0 +1,104 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      GRADLE_HOME: /opt/gradle/gradle-8.2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Accept SDK licenses
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/licenses"
+          printf '%s' '24333f8a63b6825ea9c5514f83c2829b004d1fee' > "$ANDROID_SDK_ROOT/licenses/android-sdk-license"
+          printf '%s' '84831b9409646a918e30573bab4c9c91346d8abd' > "$ANDROID_SDK_ROOT/licenses/android-sdk-preview-license"
+          echo "licenses ok"
+
+      - name: Install SDK components
+        run: |
+          SM=$(ls "$ANDROID_SDK_ROOT"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          echo "sdkmanager: $SM"
+          if [ -n "$SM" ]; then
+            yes 2>/dev/null | "$SM" --sdk_root="$ANDROID_SDK_ROOT" --install "platform-tools" "platforms;android-33" "build-tools;33.0.2" || echo "sdkmanager install skipped"
+          fi
+          echo "--- platforms ---"
+          ls "$ANDROID_SDK_ROOT/platforms" 2>/dev/null || echo none
+          echo "--- build-tools ---"
+          ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null || echo none
+
+      - name: Install Gradle 8.2
+        run: |
+          sudo mkdir -p /opt/gradle
+          cd /opt/gradle
+          curl -sSL -o g.zip https://services.gradle.org/distributions/gradle-8.2-bin.zip
+          ls -lh g.zip
+          sudo unzip -q -o g.zip
+          rm -f g.zip
+          ls /opt/gradle
+          "$GRADLE_HOME/bin/gradle" --version | head -5
+
+      - name: Prepare project layout
+        run: |
+          if [ -f AndroidManifest.xml ] && [ -d src ]; then
+            echo "module root detected, wrapping"
+            mkdir -p /tmp/wrap/app
+            for x in * .[!.]*; do
+              if [ "$x" = ".github" ]; then continue; fi
+              if [ -e "$x" ]; then mv "$x" /tmp/wrap/app/ 2>/dev/null; fi
+            done
+            mv /tmp/wrap/app . 2>/dev/null || true
+          fi
+          ls -la
+          echo "--- app ---"
+          ls -la app 2>/dev/null | head -20
+
+      - name: Write settings.gradle
+        run: |
+          printf '%s\n' "pluginManagement {" "    repositories { google(); mavenCentral(); gradlePluginPortal() }" "}" "dependencyResolutionManagement {" "    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)" "    repositories { google(); mavenCentral() }" "}" "rootProject.name = 'chat'" "include ':app'" > settings.gradle
+          cat settings.gradle
+
+      - name: Write root build.gradle
+        run: |
+          printf '%s\n' "buildscript {" "    repositories { google(); mavenCentral() }" "    dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }" "}" > build.gradle
+          cat build.gradle
+
+      - name: Write gradle.properties
+        run: |
+          printf '%s\n' "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" "org.gradle.daemon=false" "org.gradle.parallel=false" "android.useAndroidX=false" > gradle.properties
+          cat gradle.properties
+
+      - name: Show versions
+        run: |
+          echo "gradle: $("$GRADLE_HOME/bin/gradle" --version | grep Gradle)"
+          echo "sdk platforms:"; ls "$ANDROID_SDK_ROOT/platforms" 2>/dev/null || echo none
+          echo "sdk build-tools:"; ls "$ANDROID_SDK_ROOT/build-tools" 2>/dev/null || echo none
+          echo "--- app/build.gradle ---"
+          cat app/build.gradle 2>/dev/null || echo "app/build.gradle 缺失"
+
+      - name: Build Debug APK
+        run: |
+          "$GRADLE_HOME/bin/gradle" :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30

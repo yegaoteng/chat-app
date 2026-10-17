@@ -1,0 +1,75 @@
+package xfan.chat.app;
+
+import org.json.JSONObject;
+
+public class Models {
+
+    public static class Msg {
+        public String username = "";
+        public String content = "";
+        public String type = "text";
+        public long timestamp = 0;
+        public String avatar = "";
+        public int dup = 0;
+        public int id = 0;          // 私聊消息 id
+        public String badge = "";
+        public boolean recalled;
+
+        public String key() {
+            if (id > 0) return "p_" + id;
+            return "w_" + timestamp + "_" + username + "_" + content.hashCode() + "_" + dup;
+        }
+    }
+
+    public static class Friend {
+        public String username = "";
+        public String avatar = "";
+        public String namecolor = "default";
+        public boolean online;
+        public String last = "";
+        public long lastTs;
+        public int unread;
+        public boolean pinned;
+    }
+
+    public static class Channel {
+        public String code = "";
+        public String name = "";
+        public String desc = "";
+        public long lastTs;
+        public int unread;
+    }
+
+    public static class Req {
+        public int id;
+        public String username = "";
+        public String avatar = "";
+        public String reason = "";
+    }
+
+    public static class Upload {
+        public String name = "";
+        public String url = "";
+        public long time;
+        public int cost;
+        public int refund;
+    }
+
+    public static class StyleItem {
+        public String key = "";
+        public String name = "";
+        public String desc = "";
+        public int price;
+        public boolean owned;
+
+        public static StyleItem from(JSONObject o) {
+            StyleItem s = new StyleItem();
+            s.key = o.optString("key", "");
+            s.name = o.optString("name", "");
+            s.desc = o.optString("desc", "");
+            s.price = o.optInt("price", 0);
+            s.owned = o.optBoolean("owned", false);
+            return s;
+        }
+    }
+}

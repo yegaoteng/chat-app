@@ -1,0 +1,16 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionMetadata {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'chat'
+include ':app'

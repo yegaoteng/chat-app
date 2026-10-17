@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">chat破解版</string>
+    <string name="title_image">图片预览</string>
+
+    <string name="tab_chat">聊天</string>
+    <string name="tab_friends">好友</string>
+    <string name="tab_me">我的</string>
+
+    <string name="hint_server">服务器地址，如 http://example.com/chat</string>
+    <string name="hint_user">用户名</string>
+    <string name="hint_pass">密码</string>
+    <string name="hint_invite">邀请码</string>
+    <string name="hint_msg">输入消息…</string>
+
+    <string name="btn_login">登录</string>
+    <string name="btn_register">注册</string>
+    <string name="btn_send">发送</string>
+    <string name="btn_ok">确定</string>
+    <string name="btn_cancel">取消</string>
+    <string name="btn_close">关闭</string>
+
+    <string name="drawer_title">个性化</string>
+    <string name="sec_theme">主题</string>
+    <string name="sec_bubble">气泡</string>
+    <string name="sec_namecolor">名称颜色</string>
+    <string name="sec_sign">每日签到</string>
+    <string name="sec_redeem">积分兑换</string>
+    <string name="sec_ann">公告</string>
+
+    <string name="me_points">积分</string>
+    <string name="me_invite">我的邀请码</string>
+    <string name="me_bio">个人简介</string>
+    <string name="me_uploads">我的上传</string>
+    <string name="me_rename">修改用户名</string>
+    <string name="me_logout">退出登录</string>
+    <string name="me_channels">我的频道</string>
+
+    <string name="ch_join">加入频道</string>
+    <string name="ch_code_hint">8 位频道码</string>
+
+    <string name="fr_add">添加好友</string>
+    <string name="fr_requests">好友申请</string>
+    <string name="fr_reason_hint">申请原因</string>
+    <string name="fr_del_title">删除好友</string>
+    <string name="fr_del_body">聊天数据会被清空，TA 不再是你的好友</string>
+    <string name="fr_del_think">我再想想</string>
+    <string name="fr_del_confirm">确认删除</string>
+    <string name="fr_pin">置顶</string>
+    <string name="fr_unpin">取消置顶</string>
+
+    <string name="upd_title">发现新版本</string>
+    <string name="upd_download">下载更新</string>
+    <string name="upd_later">稍后再说</string>
+
+    <string name="msg_recall">撤回</string>
+    <string name="msg_copy">复制</string>
+    <string name="msg_net_error">网络错误</string>
+    <string name="msg_loading">加载中…</string>
+</resources>
