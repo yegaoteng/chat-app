@@ -87,6 +87,13 @@ public class ChatFragment extends Fragment {
         ad.setOnImageClick(new MsgAdapter.OnImageClick() {
             public void onImage(String content) { openImage(content); }
         });
+        // 图片消息的长按由 adapter 转发（图片可点击后 ListView 收不到长按）
+        ad.setOnItemLongClick(new MsgAdapter.OnItemLongClick() {
+            public void onLongClick(int pos) {
+                if (pos < 0 || pos >= data.size()) return;
+                showMsgMenu(data.get(pos));
+            }
+        });
         lv.setAdapter(ad);
 
         btnSend.setOnClickListener(new View.OnClickListener() {
@@ -371,19 +378,52 @@ public class ChatFragment extends Fragment {
                         if (r == null || !r.optBoolean("success", false)) return;
                         JSONArray arr = r.optJSONArray("users");
                         if (arr == null) return;
+
+                        // 服务端同时返回 colors：username -> namecolor。
+                        // 每个在线昵称要显示「他自己的」个性化颜色，
+                        // 否则别人看到的都是默认色。
+                        JSONObject colors = r.optJSONObject("colors");
+                        final java.util.Map<String, String> cmap =
+                                new java.util.HashMap<String, String>();
+                        if (colors != null) {
+                            java.util.Iterator<String> it = colors.keys();
+                            while (it.hasNext()) {
+                                String k = it.next();
+                                cmap.put(k, colors.optString(k, "default"));
+                            }
+                        }
+
                         String prefix = "在线 " + arr.length() + "：";
                         StringBuilder sb = new StringBuilder(prefix);
+                        // 记录每个人名在拼接串里的起止位置，后面按段上色
+                        java.util.List<int[]> spans = new java.util.ArrayList<int[]>();
                         for (int i = 0; i < arr.length() && i < 8; i++) {
-                            sb.append(arr.optString(i, ""));
-                            if (i < arr.length() - 1) sb.append("、");
+                            String nm = arr.optString(i, "");
+                            int st = sb.length();
+                            sb.append(nm);
+                            spans.add(new int[]{st, sb.length()});
+                            if (i < arr.length() - 1 && i < 7) sb.append("、");
                         }
                         if (tvOnline != null) {
-                            // 「在线 N」用绿色，后面的人名保持常规色
                             android.text.SpannableString sp =
                                     new android.text.SpannableString(sb.toString());
+                            // 「在线 N」用绿色
                             sp.setSpan(new android.text.style.ForegroundColorSpan(0xFF2E7D32),
                                     0, prefix.length(),
                                     android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            // 每个人名用它自己的名称颜色
+                            for (int i = 0; i < spans.size(); i++) {
+                                int[] rg = spans.get(i);
+                                String nm = arr.optString(i, "");
+                                String key = cmap.containsKey(nm) ? cmap.get(nm) : "default";
+                                int col = ThemeEngine.namePlainColorFor(key);
+                                if ("rainbow_static".equals(key) || "rainbow_dynamic".equals(key)) {
+                                    col = ThemeEngine.rainbowColor(i);
+                                }
+                                sp.setSpan(new android.text.style.ForegroundColorSpan(col),
+                                        rg[0], rg[1],
+                                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            }
                             tvOnline.setText(sp);
                         }
                     }

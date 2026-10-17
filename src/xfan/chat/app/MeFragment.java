@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -25,7 +26,8 @@ public class MeFragment extends Fragment {
     public MainActivity host;
     private ImageView ivAvatar;
     private TextView tvName, tvBio, tvPts, tvVer, tvUid;
-    private Button btnSign, btnInvite, btnBio, btnRename, btnAvatar, btnLogout;
+    private Button btnSign, btnInvite, btnBio, btnRename, btnAvatar, btnLogout, btnUpdate;
+    private ProgressBar pbUpdate;
     private android.widget.ProgressBar pbSign;
     private String inviteCode = "";
     private String myUid = "";
@@ -51,6 +53,8 @@ public class MeFragment extends Fragment {
         btnRename = v.findViewById(R.id.btnRename);
         btnAvatar = v.findViewById(R.id.btnAvatar);
         btnLogout = v.findViewById(R.id.btnLogout);
+        btnUpdate = v.findViewById(R.id.btnUpdate);
+        pbUpdate  = v.findViewById(R.id.pbUpdate);
 
         try {
             tvVer.setText("v" + getActivity().getPackageManager()
@@ -83,6 +87,9 @@ public class MeFragment extends Fragment {
         });
         btnAvatar.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) { pickAvatar(); }
+        });
+        btnUpdate.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v2) { checkUpdate(); }
         });
         btnLogout.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) {
@@ -287,6 +294,22 @@ public class MeFragment extends Fragment {
             startActivity(new Intent(getActivity(), ImageViewActivity.class)
                     .putExtra("url", Api.absUrl(avatarUrl)));
         } catch (Exception ignore) {}
+    }
+
+    /** 手动检查更新：无论结果如何都要给反馈 */
+    private void checkUpdate() {
+        if (getActivity() == null) return;
+        if (btnUpdate != null) btnUpdate.setVisibility(View.GONE);
+        if (pbUpdate != null) pbUpdate.setVisibility(View.VISIBLE);
+        // 转圈至少可见一小会儿，避免闪一下看不出在检查
+        new android.os.Handler().postDelayed(new Runnable() {
+            public void run() {
+                if (getActivity() == null) return;
+                if (pbUpdate != null) pbUpdate.setVisibility(View.GONE);
+                if (btnUpdate != null) btnUpdate.setVisibility(View.VISIBLE);
+                UpdateManager.checkManual(getActivity());
+            }
+        }, 350);
     }
 
     private void pickAvatar() {

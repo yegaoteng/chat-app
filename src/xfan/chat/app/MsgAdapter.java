@@ -27,9 +27,21 @@ public class MsgAdapter extends BaseAdapter {
         void onImage(String content);
     }
 
+    /**
+     * 长按回调。
+     * 图片消息里的 ImageView 设了 OnClickListener 后会变成 clickable，
+     * ListView 的 onItemLongClick 就收不到事件了（这正是「图片长按没反应」的原因）。
+     * 所以图片要自己挂长按并转发给外层。
+     */
+    public interface OnItemLongClick {
+        void onLongClick(int pos);
+    }
+
     private OnImageClick imageClick;
+    private OnItemLongClick longClick;
 
     public void setOnImageClick(OnImageClick l) { imageClick = l; }
+    public void setOnItemLongClick(OnItemLongClick l) { longClick = l; }
 
     public MsgAdapter(Context c, List<Models.Msg> d) {
         ctx = c;
@@ -72,6 +84,7 @@ public class MsgAdapter extends BaseAdapter {
         }
 
         final Models.Msg m = data.get(pos);
+        vh.pos = pos;
         String me = Prefs.user();
         boolean self = me != null && me.equals(m.username);
 
@@ -109,6 +122,16 @@ public class MsgAdapter extends BaseAdapter {
             vh.imgLoading.setVisibility(View.GONE);
             vh.body.setVisibility(View.VISIBLE);
             vh.body.setText(m.content);
+            // 文本消息：整行都要能长按（含引用块）
+            View.OnLongClickListener ol2 = new View.OnLongClickListener() {
+                public boolean onLongClick(View v) {
+                    if (longClick != null) { longClick.onLongClick(pos); return true; }
+                    return false;
+                }
+            };
+            vh.body.setOnLongClickListener(ol2);
+            if (vh.quoteBox != null) vh.quoteBox.setOnLongClickListener(ol2);
+            if (vh.root != null) vh.root.setOnLongClickListener(ol2);
         }
 
         // ---- 头像：自己也显示（放右侧）----
@@ -173,11 +196,23 @@ public class MsgAdapter extends BaseAdapter {
     }
 
     private void bindImageClick(final ViewHolder vh, final String content) {
+        final int myPos = vh.pos;
         vh.img.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 if (imageClick != null) imageClick.onImage(content);
             }
         });
+        // 长按：图片可点击后 ListView 的条目长按收不到，这里自己转发
+        View.OnLongClickListener ol = new View.OnLongClickListener() {
+            public boolean onLongClick(View v) {
+                if (longClick != null) { longClick.onLongClick(myPos); return true; }
+                return false;
+            }
+        };
+        vh.img.setOnLongClickListener(ol);
+        if (vh.imgLoading != null) vh.imgLoading.setOnLongClickListener(ol);
+        if (vh.body != null) vh.body.setOnLongClickListener(ol);
+        if (vh.root != null) vh.root.setOnLongClickListener(ol);
     }
 
     private void loadAvatar(final ImageView iv, final String name, final String url) {
@@ -216,6 +251,7 @@ public class MsgAdapter extends BaseAdapter {
     }
 
     static class ViewHolder {
+        int pos;
         View root;
         LinearLayout inner, quoteBox;
         ImageView avLeft, avRight, img;

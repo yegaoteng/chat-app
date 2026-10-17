@@ -184,10 +184,15 @@ public class ThemeEngine {
         return namePlainColorFor(nameKey());
     }
 
-    /** 按指定名称颜色 key 取普通色 */
+    /**
+     * 按指定名称颜色 key 取普通色。
+     * default 表示「没有个性化」，必须跟随主题正文色。
+     * 不能让它受金色主题影响变成金色，否则没有设置个性化的用户
+     * 在别人眼里也会被当成金色，个性化就失去区分度了。
+     */
     public static int namePlainColorFor(String key) {
         if ("gold".equals(key)) return 0xFFD4A017;
-        return isGold() ? 0xFF8A5A00 : 0xFF222222;
+        return themeText();
     }
 
     /** 给 TextView 应用名称颜色（彩虹用渐变 shader，动态带流动） */

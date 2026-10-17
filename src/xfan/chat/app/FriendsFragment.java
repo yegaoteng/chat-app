@@ -116,7 +116,11 @@ public class FriendsFragment extends Fragment {
                 } else {
                     av.setImageDrawable(new Avatars(f.username));
                 }
-                ThemeEngine.applyNameColor(name, null);
+                // 关键：用好友自己的名称颜色，不能用「我」的。
+                // 之前传 null 会套用我的个性化，导致：
+                //   1) 别人看我时显示成他自己的颜色
+                //   2) 我看别人时全员显示成我的颜色
+                ThemeEngine.applyNameColorFor(name, f.namecolor);
                 last.setTextColor(ThemeEngine.themeTextSub());
                 return cv;
             }

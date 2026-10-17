@@ -9,6 +9,15 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
+    <!-- 开屏：无标题、全屏、状态栏隐藏，纯展示图片 -->
+    <style name="SplashTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+
     <style name="FullscreenTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">@android:color/black</item>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  开屏画面。
+
+  自定义图片：把你的图覆盖到
+      app/res/drawable/splash.png       竖屏（建议 1080x1920）
+      app/res/drawable-land/splash.png  横屏（建议 1920x1080）
+  两张都用同一个文件名 splash.png，系统会自动按屏幕方向选。
+  只放竖屏那张也能用，横屏会自动拉伸（用 centerCrop 裁切）。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0D0D16">
+
+    <ImageView
+        android:id="@+id/ivSplash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:adjustViewBounds="false"
+        android:contentDescription="@string/app_name"
+        android:scaleType="centerCrop"
+        android:src="@drawable/splash" />
+
+    <ProgressBar
+        android:id="@+id/pbSplash"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="56dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvSplashTip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="26dp"
+        android:textColor="#CCFFFFFF"
+        android:textSize="12sp"
+        android:visibility="gone" />
+</FrameLayout>
