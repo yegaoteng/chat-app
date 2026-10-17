@@ -1,5 +1,6 @@
 package xfan.chat.app;
 
+import android.content.Context;
 import android.util.Log;
 
 import org.json.JSONObject;
@@ -31,8 +32,29 @@ public class Api {
      */
     public static final boolean USE_GET_ONLY = true;
 
+    // true = 走 WebView 发请求（浏览器身份，可绕过 WAF 验证）
+    // 需要服务器上同时存在 bridge.html
+    public static boolean USE_WEBVIEW = true;
+
+    // true = 用 http:// 而非 https://（部分网关只对 https 做验证）
+    public static boolean USE_HTTP = false;
+
     // 服务器地址写死在源码里，登录页不再让用户输入
-    public static final String SERVER = "https://f.ffurry.cc.cd/chat/appapi.php";
+    public static String SERVER = "https://ffurry.hyperphp.com/chat/appapi.php";
+
+    /** 应用启动时按 USE_HTTP 切换协议 */
+    public static void applyHttpSwitch() {
+        if (USE_HTTP && SERVER.startsWith("https://")) {
+            SERVER = "http://" + SERVER.substring(8);
+        }
+    }
+
+    /** 记一次失败原因，便于在界面上集中展示 */
+    public static void noteError(String s) { lastError = s; }
+
+    private static Context ctxRef;
+
+    public static void bindContext(Context c) { ctxRef = c; }
 
     public static String base() {
         String s = SERVER;
@@ -100,6 +122,18 @@ public class Api {
 
     /** GET 请求，返回 JSONObject；失败返回 null */
     public static JSONObject get(String path) {
+        if (USE_WEBVIEW) {
+            String raw = webGet(abs(path));
+            lastUrl = abs(path);
+            if (raw == null) { lastError = "WebView 请求失败（桥未就绪或超时）"; return null; }
+            try { return new JSONObject(raw); }
+            catch (Exception je) {
+                lastError = "WebView 返回非 JSON：\n"
+                        + (raw.length() > 200 ? raw.substring(0, 200) + "…" : raw);
+                // 桥拿不到数据时退回直连，避免整站不可用
+                Log.w(TAG, "WebView 通道失败，回退直连");
+            }
+        }
         try {
             lastUrl = abs(path);
             HttpURLConnection c = conn(lastUrl, "GET");
@@ -200,6 +234,17 @@ public class Api {
             return new JSONObject(body);
         } catch (Exception e) {
             Log.w(TAG, "UPLOAD " + path + " failed: " + e);
+            return null;
+        }
+    }
+
+    /** 通过 WebView 取原始文本 */
+    private static String webGet(String url) {
+        if (ctxRef == null) return null;
+        try {
+            return WebBridge.get(ctxRef).get(url);
+        } catch (Exception e) {
+            Log.w(TAG, "WebView 通道异常: " + e);
             return null;
         }
     }

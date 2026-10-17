@@ -37,6 +37,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Prefs.init(this);
+        // WebView 通道要在任何请求之前初始化
+        Api.applyHttpSwitch();
+        Api.bindContext(this);
         self = this;
         setContentView(R.layout.activity_main);
 

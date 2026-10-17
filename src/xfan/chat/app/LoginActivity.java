@@ -22,6 +22,9 @@ public class LoginActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Prefs.init(this);
+        // WebView 通道要在任何请求之前初始化
+        Api.applyHttpSwitch();
+        Api.bindContext(this);
         setContentView(R.layout.activity_login);
 
         edUser   = findViewById(R.id.edUser);
@@ -222,7 +225,17 @@ public class LoginActivity extends Activity {
 
     /** 错误详情可能很长，toast 会截断 —— 用可滚动对话框完整显示 */
     private void showErr(String title) {
+        String chan = "直连";
+        String ck = "";
+        try {
+            WebBridge wb = WebBridge.get(this);
+            chan = "WebView:" + (wb.isReady() ? "就绪" : "未就绪");
+            ck = wb.cookies();
+        } catch (Exception ignore) {}
         final String detail = "请求地址：\n" + Api.lastUrl
+                + "\n\n通道：" + chan + "（开关 USE_WEBVIEW=" + Api.USE_WEBVIEW
+                + "，USE_HTTP=" + Api.USE_HTTP + "）"
+                + (ck.isEmpty() ? "" : "\nWebView cookie：\n" + ck)
                 + "\n\n原因：\n" + (Api.lastError.isEmpty() ? "未知" : Api.lastError);
         final android.widget.TextView tv = new android.widget.TextView(this);
         tv.setText(detail);
