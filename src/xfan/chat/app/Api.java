@@ -23,6 +23,14 @@ public class Api {
     /** 最后一次失败的详情：HTTP 码 / 异常 / 返回片段 */
     public static String lastError = "";
 
+    /**
+     * 全站强制 GET。
+     * 该主机上 POST 会被网关拦截（400 Bad Request / openresty），
+     * 而 GET 实测可正常返回 JSON，所以所有请求一律走 GET。
+     * 副作用：参数（含密码）会出现在 URL 里，服务端 access log 可能记录。
+     */
+    public static final boolean USE_GET_ONLY = true;
+
     // 服务器地址写死在源码里，登录页不再让用户输入
     public static final String SERVER = "https://ffurry.hyperphp.com/chat/appapi.php";
 
@@ -108,6 +116,10 @@ public class Api {
 
     /** POST JSON，返回 JSONObject；失败返回 null */
     public static JSONObject post(String path, JSONObject data) {
+        if (USE_GET_ONLY) {
+            String q = toForm(data);
+            return get(q.isEmpty() ? path : path + (path.contains("?") ? "&" : "?") + q);
+        }
         try {
             lastUrl = abs(path);
             HttpURLConnection c = conn(lastUrl, "POST");
