@@ -71,7 +71,16 @@ public class Api {
         if (t != null && !t.isEmpty()) {
             c.setRequestProperty("Cookie", "chat_token=" + t);
         }
-        c.setRequestProperty("User-Agent", "xfan-chat-app");
+        c.setRequestProperty("User-Agent",
+                "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 "
+                        + "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
+        c.setRequestProperty("Accept",
+                "application/json, text/plain, */*");
+        c.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9");
+        // 带 Referer 与 X-Requested-With，更接近网页表单发起的请求
+        String host = u.getProtocol() + "://" + u.getHost();
+        c.setRequestProperty("Referer", host + "/");
+        c.setRequestProperty("X-Requested-With", "XMLHttpRequest");
         return c;
     }
 
@@ -103,8 +112,9 @@ public class Api {
             lastUrl = abs(path);
             HttpURLConnection c = conn(lastUrl, "POST");
             c.setDoOutput(true);
-            c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            byte[] payload = (data == null ? new JSONObject() : data).toString().getBytes("UTF-8");
+            // 优先用表单编码：部分网关会拦截 Content-Type: application/json 的 POST
+            c.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            byte[] payload = toForm(data).getBytes("UTF-8");
             OutputStream os = c.getOutputStream();
             os.write(payload);
             os.flush();
@@ -117,12 +127,14 @@ public class Api {
             catch (Exception je) {
                 lastError = "HTTP " + code + "\n返回不是 JSON：\n"
                         + (body.length() > 200 ? body.substring(0, 200) + "…" : body);
-                return null;
+                // 网关拦了 POST，降级用 GET 重发一次（参数放 query）
+                Log.w(TAG, "POST 被拦截，降级为 GET 重试");
+                return get(path + (path.contains("?") ? "&" : "?") + toForm(data));
             }
         } catch (Exception e) {
             lastError = errText(e);
             Log.w(TAG, "POST " + path + " failed: " + e);
-            return null;
+            return get(path + (path.contains("?") ? "&" : "?") + toForm(data));
         }
     }
 
@@ -172,6 +184,28 @@ public class Api {
             Log.w(TAG, "UPLOAD " + path + " failed: " + e);
             return null;
         }
+    }
+
+    /** JSONObject -> a=1&b=2 形式，key/value 做 URL 编码 */
+    private static String toForm(JSONObject o) {
+        if (o == null) return "";
+        StringBuilder sb = new StringBuilder();
+        java.util.Iterator<String> it = o.keys();
+        boolean first = true;
+        while (it.hasNext()) {
+            String k = it.next();
+            Object v = o.opt(k);
+            if (v == null) continue;
+            if (!first) sb.append('&');
+            first = false;
+            sb.append(enc(k)).append('=').append(enc(String.valueOf(v)));
+        }
+        return sb.toString();
+    }
+
+    private static String enc(String s) {
+        try { return java.net.URLEncoder.encode(s, "UTF-8"); }
+        catch (Exception e) { return s; }
     }
 
     private static String errText(Exception e) {
