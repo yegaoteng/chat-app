@@ -29,23 +29,10 @@
             android:textStyle="bold" />
 
         <EditText
-            android:id="@+id/edServer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="36dp"
-            android:hint="@string/hint_server"
-            android:inputType="textUri"
-            android:background="@drawable/bg_input"
-            android:padding="12dp"
-            android:textColor="@color/text"
-            android:textColorHint="@color/text_sub"
-            android:textSize="14sp" />
-
-        <EditText
             android:id="@+id/edUser"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="36dp"
             android:hint="@string/hint_user"
             android:background="@drawable/bg_input"
             android:padding="12dp"

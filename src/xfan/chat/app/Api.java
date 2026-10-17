@@ -20,9 +20,14 @@ public class Api {
 
     /** 最后一次实际请求的完整地址（失败时用于提示） */
     public static String lastUrl = "";
+    /** 最后一次失败的详情：HTTP 码 / 异常 / 返回片段 */
+    public static String lastError = "";
+
+    // 服务器地址写死在源码里，登录页不再让用户输入
+    public static final String SERVER = "https://ffurry.hyperphp.com/chat/appapi.php";
 
     public static String base() {
-        String s = Prefs.server();
+        String s = SERVER;
         if (s == null) return "";
         s = s.trim();
         while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
@@ -79,8 +84,14 @@ public class Api {
             String body = read(code < 400 ? c.getInputStream() : c.getErrorStream());
             c.disconnect();
             Log.d(TAG, "GET " + path + " -> " + body);
-            return new JSONObject(body);
+            try { return new JSONObject(body); }
+            catch (Exception je) {
+                lastError = "HTTP " + code + "\n返回不是 JSON：\n"
+                        + (body.length() > 200 ? body.substring(0, 200) + "…" : body);
+                return null;
+            }
         } catch (Exception e) {
+            lastError = errText(e);
             Log.w(TAG, "GET " + path + " failed: " + e);
             return null;
         }
@@ -102,8 +113,14 @@ public class Api {
             String body = read(code < 400 ? c.getInputStream() : c.getErrorStream());
             c.disconnect();
             Log.d(TAG, "POST " + path + " -> " + body);
-            return new JSONObject(body);
+            try { return new JSONObject(body); }
+            catch (Exception je) {
+                lastError = "HTTP " + code + "\n返回不是 JSON：\n"
+                        + (body.length() > 200 ? body.substring(0, 200) + "…" : body);
+                return null;
+            }
         } catch (Exception e) {
+            lastError = errText(e);
             Log.w(TAG, "POST " + path + " failed: " + e);
             return null;
         }
@@ -155,6 +172,17 @@ public class Api {
             Log.w(TAG, "UPLOAD " + path + " failed: " + e);
             return null;
         }
+    }
+
+    private static String errText(Exception e) {
+        String n = e.getClass().getSimpleName();
+        String m = e.getMessage() == null ? "" : e.getMessage();
+        if (e instanceof java.net.UnknownHostException)  return "域名解析失败（UnknownHost）\n" + m;
+        if (e instanceof java.net.ConnectException)      return "连接被拒绝（ConnectException）\n" + m;
+        if (e instanceof java.net.SocketTimeoutException) return "连接超时（Timeout）\n" + m;
+        if (e instanceof javax.net.ssl.SSLException)     return "SSL/HTTPS 错误\n" + m;
+        if (e instanceof java.io.FileNotFoundException)  return "HTTP 404，文件不存在\n" + m;
+        return n + "\n" + m;
     }
 
     private static String read(InputStream in) {

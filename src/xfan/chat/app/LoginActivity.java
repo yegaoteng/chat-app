@@ -13,7 +13,7 @@ import org.json.JSONObject;
 
 public class LoginActivity extends Activity {
 
-    private EditText edServer, edUser, edPass, edInvite;
+    private EditText edUser, edPass, edInvite;
     private Button btnLogin, btnRegister;
     private TextView tvTip;
     private boolean regMode = false;
@@ -24,7 +24,6 @@ public class LoginActivity extends Activity {
         Prefs.init(this);
         setContentView(R.layout.activity_login);
 
-        edServer = findViewById(R.id.edServer);
         edUser   = findViewById(R.id.edUser);
         edPass   = findViewById(R.id.edPass);
         edInvite = findViewById(R.id.edInvite);
@@ -32,8 +31,6 @@ public class LoginActivity extends Activity {
         btnRegister = findViewById(R.id.btnRegister);
         tvTip    = findViewById(R.id.tvTip);
 
-        String s = Prefs.server();
-        if (s != null && !s.isEmpty()) edServer.setText(s);
         String u = Prefs.user();
         if (u != null && !u.isEmpty()) edUser.setText(u);
 
@@ -76,13 +73,10 @@ public class LoginActivity extends Activity {
     }
 
     private boolean checkInput() {
-        String s = edServer.getText().toString().trim();
         String u = edUser.getText().toString().trim();
         String p = edPass.getText().toString().trim();
-        if (s.isEmpty()) { toast("请填写服务器地址"); return false; }
         if (u.isEmpty()) { toast("请填写用户名"); return false; }
         if (p.isEmpty()) { toast("请填写密码"); return false; }
-        Prefs.server(s);
         return true;
     }
 
@@ -102,7 +96,7 @@ public class LoginActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     public void run() {
                         setBusy(false, "");
-                        if (r == null) { toast("网络错误\n" + Api.lastUrl); return; }
+                        if (r == null) { showErr("登录失败"); return; }
                         if (!r.optBoolean("success", false)) {
                             toast(r.optString("error", "登录失败"));
                             return;
@@ -138,7 +132,7 @@ public class LoginActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     public void run() {
                         setBusy(false, "");
-                        if (r == null) { toast("网络错误\n" + Api.lastUrl); return; }
+                        if (r == null) { showErr("登录失败"); return; }
                         if (!r.optBoolean("success", false)) {
                             toast(r.optString("error", "注册失败"));
                             return;
@@ -160,6 +154,34 @@ public class LoginActivity extends Activity {
                 });
             }
         }).start();
+    }
+
+    /** 错误详情可能很长，toast 会截断 —— 用可滚动对话框完整显示 */
+    private void showErr(String title) {
+        final String detail = "请求地址：\n" + Api.lastUrl
+                + "\n\n原因：\n" + (Api.lastError.isEmpty() ? "未知" : Api.lastError);
+        final android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(detail);
+        tv.setTextIsSelectable(true);
+        tv.setTextSize(12);
+        tv.setTextColor(0xFFDDDDDD);
+        tv.setPadding(24, 16, 24, 16);
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.addView(tv);
+
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(sv)
+                .setNegativeButton(R.string.btn_close, null)
+                .setPositiveButton("复制", new android.content.DialogInterface.OnClickListener() {
+                    public void onClick(android.content.DialogInterface d, int w) {
+                        android.content.ClipboardManager cm =
+                                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        cm.setText(detail);
+                        toast("已复制错误详情");
+                    }
+                })
+                .show();
     }
 
     private void setBusy(boolean busy, String tip) {
