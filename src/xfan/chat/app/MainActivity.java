@@ -40,6 +40,10 @@ public class MainActivity extends Activity {
         // WebView 通道要在任何请求之前初始化
         Api.applyHttpSwitch();
         Api.bindContext(this);
+        // 后台借用 WebView 完成浏览器验证，把 __test 回灌给直连
+        new Thread(new Runnable() {
+            public void run() { Api.syncWebCookies(MainActivity.this); }
+        }).start();
         self = this;
         setContentView(R.layout.activity_main);
 

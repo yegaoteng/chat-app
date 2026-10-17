@@ -25,6 +25,10 @@ public class LoginActivity extends Activity {
         // WebView 通道要在任何请求之前初始化
         Api.applyHttpSwitch();
         Api.bindContext(this);
+        // 后台借用 WebView 完成浏览器验证，把 __test 回灌给直连
+        new Thread(new Runnable() {
+            public void run() { Api.syncWebCookies(LoginActivity.this); }
+        }).start();
         setContentView(R.layout.activity_login);
 
         edUser   = findViewById(R.id.edUser);
@@ -246,10 +250,19 @@ public class LoginActivity extends Activity {
         android.widget.ScrollView sv = new android.widget.ScrollView(this);
         sv.addView(tv);
 
-        new android.app.AlertDialog.Builder(this)
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this)
                 .setTitle(title)
                 .setView(sv)
-                .setNegativeButton(R.string.btn_close, null)
+                .setNegativeButton(R.string.btn_close, null);
+
+        // 返回的是 HTML（多半被网关拦截），且还没有验证 cookie → 引导浏览器登录
+        boolean blocked = Api.lastError != null && Api.lastError.contains("不是 JSON");
+        if (blocked && Prefs.testCookie().isEmpty()) {
+            b.setNeutralButton("用浏览器登录", new android.content.DialogInterface.OnClickListener() {
+                public void onClick(android.content.DialogInterface d, int w) { openWebLogin(); }
+            });
+        }
+        b
                 .setPositiveButton("复制", new android.content.DialogInterface.OnClickListener() {
                     public void onClick(android.content.DialogInterface d, int w) {
                         android.content.ClipboardManager cm =

@@ -53,6 +53,40 @@ public class Api {
     /** 记一次失败原因，便于在界面上集中展示 */
     public static void noteError(String s) { lastError = s; }
 
+    /**
+     * 借用 WebView 完成一次浏览器验证，把拿到的 __test 回灌给直连。
+     * 这样即使不走 WebView 通道，直连也能带上验证身份。
+     */
+    public static void syncWebCookies(Context c) {
+        if (c == null) return;
+        String has = Prefs.testCookie();
+        if (has != null && !has.isEmpty()) return;   // 已拿到就不重复
+        try {
+            WebBridge wb = WebBridge.get(c.getApplicationContext());
+            String raw = wb.grabCookie(base() + "/");
+            if (raw == null || raw.isEmpty()) return;
+            String test = pick(raw, "__test");
+            if (!test.isEmpty()) {
+                Prefs.testCookie(test);
+                Log.d(TAG, "已从 WebView 同步 __test: " + test);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "同步 WebView cookie 失败: " + t);
+        }
+    }
+
+    /** 从 "a=1; __test=xxx; b=2" 中取指定键 */
+    private static String pick(String cookieHeader, String key) {
+        String[] parts = cookieHeader.split(";");
+        for (String p : parts) {
+            String t = p.trim();
+            int i = t.indexOf('=');
+            if (i <= 0) continue;
+            if (t.substring(0, i).trim().equals(key)) return t.substring(i + 1).trim();
+        }
+        return "";
+    }
+
     private static int webFail = 0;
 
     /** 并发闸门：在途请求上限，防止轮询把线程池堆满 */

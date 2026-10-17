@@ -132,6 +132,25 @@ public class WebBridge {
     public boolean isReady() { return ready; }
     public String cookies() { return cookies; }
 
+    /** 从 WebView cookie jar 取指定地址的 cookie（含 __test 验证 cookie） */
+    public String grabCookie(final String url) {
+        if (!waitReady()) return "";
+        final String[] out = new String[1];
+        out[0] = "";
+        final CountDownLatch l = new CountDownLatch(1);
+        main.post(new Runnable() {
+            public void run() {
+                try {
+                    String c = CookieManager.getInstance().getCookie(url);
+                    out[0] = c == null ? "" : c;
+                } catch (Exception e) { out[0] = ""; }
+                l.countDown();
+            }
+        });
+        try { l.await(3, TimeUnit.SECONDS); } catch (Exception ignore) {}
+        return out[0];
+    }
+
     /** 刷新 cookies 快照（用于排查） */
     public void fetchCookies() {
         if (!ready) return;
