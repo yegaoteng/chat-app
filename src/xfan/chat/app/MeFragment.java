@@ -96,13 +96,26 @@ public class MeFragment extends Fragment {
             }
         });
         applyTheme();
+        // 视图刚建好：如果资料早就回来了，这里补一次
+        if (pending != null) applyProfile(pending);
+        else if (host != null) host.loadProfile();
         return v;
     }
 
     public void onShow() { if (host != null) host.loadProfile(); }
 
+    /** 视图是否已创建：数据可能在 onCreateView 之前就回来了，直接写控件会 NPE */
+    private boolean ready() {
+        return getActivity() != null && getView() != null && tvName != null;
+    }
+
+    /** 缓存最近一次资料，视图就绪后再补上，避免数据丢失 */
+    private JSONObject pending = null;
+
     public void applyProfile(JSONObject r) {
         if (r == null) return;
+        if (!ready()) { pending = r; return; }   // 视图没好，先存着
+        pending = null;
         String name = r.optString("username", "");
         tvName.setText(name);
         tvPts.setText(r.optInt("points", 0) + " 分");

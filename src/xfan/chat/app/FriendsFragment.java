@@ -149,6 +149,8 @@ public class FriendsFragment extends Fragment {
 
     /** 资料回来后刷新（昵称颜色等） */
     public void applyProfile(JSONObject r) {
+        // 视图可能尚未创建（数据在 onCreateView 之前就回来了）
+        if (getActivity() == null || getView() == null) return;
         applyTheme();
     }
 

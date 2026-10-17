@@ -145,12 +145,9 @@ public class MainActivity extends Activity {
 
         Fragment f = (t == 0) ? fChat : (t == 1 ? fFriends : fMe);
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-        // 首次添加时不挂动画（此时视图尚未就绪，动画可能取不到目标 View）
-        if (f.isAdded()) {
-            ft.setCustomAnimations(
-                    toRight ? R.anim.slide_in_right : R.anim.slide_in_left,
-                    toRight ? R.anim.slide_out_left : R.anim.slide_out_right);
-        }
+        // 不用 setCustomAnimations：FragmentManager 会用 AnimatorInflater 解析，
+        // 而补间动画(<translate>)不是合法 animator，会抛 Unknown animator name。
+        // 过渡效果改用下面的 Java 动画作用于内容容器，效果一样且不依赖 XML。
         if (!f.isAdded()) ft.add(R.id.content, f, "tab" + t);
         try {
             if (fChat.isAdded()) ft.hide(fChat);
@@ -178,6 +175,8 @@ public class MainActivity extends Activity {
         tvTitle.setText(t == 0 ? getString(R.string.tab_chat)
                 : t == 1 ? getString(R.string.tab_friends) : getString(R.string.tab_me));
 
+        animateContent(toRight);
+
         if (t == 0) safeShow(fChat);
         if (t == 1) safeShow(fFriends);
         if (t == 2) safeShow(fMe);
@@ -195,6 +194,34 @@ public class MainActivity extends Activity {
                 } catch (Exception ignore) {}
             }
         });
+    }
+
+    /**
+     * 内容区过渡动画：纯 Java 创建补间动画，不经过 AnimatorInflater。
+     * @param toRight true 表示切向右侧的页面
+     */
+    private void animateContent(final boolean toRight) {
+        final View content = findViewById(R.id.content);
+        if (content == null) return;
+        try {
+            content.clearAnimation();
+            android.view.animation.AnimationSet set =
+                    new android.view.animation.AnimationSet(true);
+            android.view.animation.TranslateAnimation ta =
+                    new android.view.animation.TranslateAnimation(
+                            android.view.animation.Animation.RELATIVE_TO_SELF,
+                            toRight ? 0.12f : -0.12f,
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0f,
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0f,
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0f);
+            android.view.animation.AlphaAnimation aa =
+                    new android.view.animation.AlphaAnimation(0.35f, 1f);
+            set.addAnimation(ta);
+            set.addAnimation(aa);
+            set.setDuration(230);
+            set.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            content.startAnimation(set);
+        } catch (Throwable ignore) {}
     }
 
     /** 选中标签的弹跳反馈 */
