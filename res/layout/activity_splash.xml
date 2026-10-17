@@ -2,11 +2,14 @@
 <!--
   开屏画面。
 
-  自定义图片：把你的图覆盖到
-      app/res/drawable/splash.png       竖屏（建议 1080x1920）
-      app/res/drawable-land/splash.png  横屏（建议 1920x1080）
-  两张都用同一个文件名 splash.png，系统会自动按屏幕方向选。
-  只放竖屏那张也能用，横屏会自动拉伸（用 centerCrop 裁切）。
+  自定义图片：放到 app/assets/ 目录，命名为
+      splash.png  或  splash.jpg  或  splash.webp
+  任意一种格式都行，程序自动识别。
+
+  ⚠ 不要放进 res/drawable！Android 资源以「文件名去扩展名」为资源名，
+    若 drawable 下同时出现 splash.png 与 splash.jpg，
+    构建会失败：Duplicate resources: drawable/splash。
+    assets 目录无此限制，故统一用 assets。
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -20,8 +23,7 @@
         android:layout_gravity="center"
         android:adjustViewBounds="false"
         android:contentDescription="@string/app_name"
-        android:scaleType="centerCrop"
-        android:src="@drawable/splash" />
+        android:scaleType="centerCrop" />
 
     <ProgressBar
         android:id="@+id/pbSplash"
@@ -38,6 +40,7 @@
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="26dp"
         android:textColor="#CCFFFFFF"
-        android:textSize="12sp"
+        android:textSize="20sp"
+        android:textStyle="bold"
         android:visibility="gone" />
 </FrameLayout>

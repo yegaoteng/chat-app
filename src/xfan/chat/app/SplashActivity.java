@@ -7,7 +7,9 @@ import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 
 import java.io.InputStream;
 
@@ -56,7 +58,16 @@ public class SplashActivity extends Activity {
         }, SPLASH_MS);
     }
 
-    /** 载入开屏图：优先 assets（支持 jpg/png/webp），没有则回退 drawable */
+    /**
+     * 载入开屏图：只从 assets 读（支持 jpg / png / webp）。
+     *
+     * 注意：不要在 res/drawable 下放开屏图！
+     * Android 资源以「文件名去掉扩展名」作为资源名，
+     * 如果 drawable 里同时出现 splash.png 和 splash.jpg，
+     * 会被判定为同名资源，构建时报：
+     *     Duplicate resources: drawable/splash, drawable/splash
+     * assets 目录没有这个限制，所以开屏图统一放 assets。
+     */
     private void showSplash() {
         ImageView iv = findViewById(R.id.ivSplash);
         if (iv == null) return;
@@ -65,9 +76,15 @@ public class SplashActivity extends Activity {
         Bitmap bm = loadFromAssets();
         if (bm != null) {
             iv.setImageBitmap(bm);
-        } else {
-            // 回退：res/drawable/splash.png（横屏自动取 drawable-land 那份）
-            iv.setImageResource(R.drawable.splash);
+            return;
+        }
+        // assets 里没有图：显示纯色背景 + 应用名，不再依赖 res 资源。
+        // 这样 res/drawable 下放任何格式都不会引发 Duplicate resources。
+        iv.setImageDrawable(null);
+        TextView tv = findViewById(R.id.tvSplashTip);
+        if (tv != null) {
+            tv.setVisibility(View.VISIBLE);
+            tv.setText(R.string.app_name);
         }
     }
 
