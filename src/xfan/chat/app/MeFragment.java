@@ -114,7 +114,7 @@ public class MeFragment extends Fragment {
         btnSign.setEnabled(!signed);
 
         String av = r.optString("avatar", "");
-        if (!av.isEmpty()) new ImgLoader(ivAvatar).load(Api.absUrl(av));
+        if (!av.isEmpty()) new ImgLoader(ivAvatar).load(Api.absUrl(av), 200, 200);
         else if (ivAvatar != null) ivAvatar.setImageDrawable(new Avatars(name));
         applyTheme();
     }

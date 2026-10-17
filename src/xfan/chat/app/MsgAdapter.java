@@ -76,7 +76,7 @@ public class MsgAdapter extends BaseAdapter {
             vh.body.setVisibility(View.GONE);
             vh.img.setVisibility(View.VISIBLE);
             vh.img.setImageDrawable(null);
-            loadImg(vh.img, Api.absUrl(m.content));
+            loadImg(vh.img, Api.absUrl(m.content), 640, 640);
             vh.img.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { openImage(m.content); }
             });
@@ -126,14 +126,15 @@ public class MsgAdapter extends BaseAdapter {
     private void loadAvatar(final ImageView iv, final String name, final String url) {
         if (iv == null) return;
         if (url != null && !url.isEmpty()) {
-            loadImg(iv, Api.absUrl(url), new Avatars(name));
+            loadImg(iv, Api.absUrl(url), new Avatars(name), 96, 96);
         } else {
             iv.setImageDrawable(new Avatars(name));
         }
     }
 
     /** 带占位图的加载，失败时保留占位（头像不至于空白） */
-    private void loadImg(final ImageView iv, final String url, final Drawable placeholder) {
+    private void loadImg(final ImageView iv, final String url,
+                         final Drawable placeholder, final int w, final int h) {
         if (iv == null) return;
         if (url == null || url.isEmpty()) { iv.setImageDrawable(placeholder); return; }
         Bitmap cached = ImgLoader.cached(url);
@@ -142,20 +143,29 @@ public class MsgAdapter extends BaseAdapter {
         iv.setTag(url);
         new Thread(new Runnable() {
             public void run() {
-                final Bitmap bm = ImgLoader.fetch(url);
-                if (bm == null) return;
-                ImgLoader.put(url, bm);
-                iv.post(new Runnable() {
-                    public void run() {
-                        if (url.equals(iv.getTag())) iv.setImageBitmap(bm);
-                    }
-                });
+                try {
+                    final Bitmap bm = ImgLoader.fetch(url, w, h);
+                    if (bm == null) return;
+                    ImgLoader.put(url, bm);
+                    iv.post(new Runnable() {
+                        public void run() {
+                            if (url.equals(iv.getTag())) iv.setImageBitmap(bm);
+                        }
+                    });
+                } catch (Throwable ignore) {
+                    // 图片解码失败（含 OOM）绝不能影响消息列表
+                }
             }
         }).start();
     }
 
-    private void loadImg(final ImageView iv, final String url) {
-        loadImg(iv, url, null);
+    private void loadImg(final ImageView iv, final String url,
+                         final Drawable placeholder) {
+        loadImg(iv, url, placeholder, 640, 640);
+    }
+
+    private void loadImg(final ImageView iv, final String url, int w, int h) {
+        loadImg(iv, url, null, w, h);
     }
 
     static class ViewHolder {

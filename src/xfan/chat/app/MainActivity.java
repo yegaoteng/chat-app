@@ -6,6 +6,7 @@ import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -56,6 +57,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        CrashGuard.install(this);
         Prefs.init(this);
         Api.applyHttpSwitch();
         Api.bindContext(this);
@@ -98,10 +100,11 @@ public class MainActivity extends Activity {
         tabFriends.setOnClickListener(tabClick);
         tabMe.setOnClickListener(tabClick);
 
-        applyTheme();
-        switchTab(0);
-        loadProfile();
-        UpdateManager.check(this);
+        // 每一步单独容错：任何一处异常都不会导致整个页面闪退
+        try { applyTheme(); } catch (Throwable t) { Log.e("XFAN", "applyTheme", t); }
+        try { switchTab(0); } catch (Throwable t) { Log.e("XFAN", "switchTab", t); }
+        try { loadProfile(); } catch (Throwable t) { Log.e("XFAN", "loadProfile", t); }
+        try { UpdateManager.check(this); } catch (Throwable t) { Log.e("XFAN", "update", t); }
     }
 
     /** 应用个性化主题到整个界面 */
@@ -142,16 +145,28 @@ public class MainActivity extends Activity {
 
         Fragment f = (t == 0) ? fChat : (t == 1 ? fFriends : fMe);
         FragmentTransaction ft = getFragmentManager().beginTransaction();
-        // 按切换方向选择滑入/滑出，让底部栏目切换有明确的空间感
-        ft.setCustomAnimations(
-                toRight ? R.anim.slide_in_right : R.anim.slide_in_left,
-                toRight ? R.anim.slide_out_left : R.anim.slide_out_right);
+        // 首次添加时不挂动画（此时视图尚未就绪，动画可能取不到目标 View）
+        if (f.isAdded()) {
+            ft.setCustomAnimations(
+                    toRight ? R.anim.slide_in_right : R.anim.slide_in_left,
+                    toRight ? R.anim.slide_out_left : R.anim.slide_out_right);
+        }
         if (!f.isAdded()) ft.add(R.id.content, f, "tab" + t);
-        if (fChat.isAdded()) ft.hide(fChat);
-        if (fFriends.isAdded()) ft.hide(fFriends);
-        if (fMe.isAdded()) ft.hide(fMe);
-        ft.show(f);
-        ft.commit();
+        try {
+            if (fChat.isAdded()) ft.hide(fChat);
+            if (fFriends.isAdded()) ft.hide(fFriends);
+            if (fMe.isAdded()) ft.hide(fMe);
+            ft.show(f);
+            ft.commit();
+        } catch (Throwable e) {
+            Log.w("XFAN", "fragment 切换失败，降级重来", e);
+            try {
+                FragmentTransaction ft2 = getFragmentManager().beginTransaction();
+                if (!f.isAdded()) ft2.add(R.id.content, f, "tab" + t);
+                ft2.show(f);
+                ft2.commitAllowingStateLoss();
+            } catch (Throwable ignore) {}
+        }
 
         int on = getResources().getColor(R.color.accent);
         int off = getResources().getColor(R.color.text_sub);
@@ -185,12 +200,14 @@ public class MainActivity extends Activity {
     /** 选中标签的弹跳反馈 */
     private void popTab(View v) {
         if (v == null) return;
+        try {
         ScaleAnimation sa = new ScaleAnimation(0.86f, 1.06f, 0.86f, 1.06f,
                 Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         sa.setDuration(150);
         sa.setRepeatMode(Animation.REVERSE);
         sa.setRepeatCount(1);
         v.startAnimation(sa);
+        } catch (Throwable ignore) {}
     }
 
     public void gotoChat() { switchTab(0); }

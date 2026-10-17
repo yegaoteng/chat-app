@@ -43,7 +43,7 @@ public class ImageViewActivity extends Activity {
             public void run() {
                 try {
                     // 走 ImgLoader：带浏览器头与验证 cookie，否则会被 WAF 拦下
-                    final Bitmap bm = ImgLoader.fetch(url);
+                    final Bitmap bm = ImgLoader.fetch(url, screen(), screen());
                     if (bm == null) throw new Exception("null");
                     runOnUiThread(new Runnable() {
                         public void run() { iv.setImageBitmap(bm); }
@@ -57,5 +57,14 @@ public class ImageViewActivity extends Activity {
                 }
             }
         }).start();
+    }
+
+    /** 取屏幕短边，全屏看图按这个尺寸解码即可 */
+    private int screen() {
+        try {
+            android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
+            getWindowManager().getDefaultDisplay().getMetrics(dm);
+            return Math.min(dm.widthPixels, dm.heightPixels);
+        } catch (Throwable e) { return 1080; }
     }
 }

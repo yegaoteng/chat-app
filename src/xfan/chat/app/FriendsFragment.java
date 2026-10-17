@@ -96,7 +96,7 @@ public class FriendsFragment extends Fragment {
 
                 String url = f.avatar == null ? "" : f.avatar;
                 if (!url.isEmpty()) {
-                    new ImgLoader(av).load(Api.absUrl(url));
+                    new ImgLoader(av).load(Api.absUrl(url), 96, 96);
                 } else {
                     av.setImageDrawable(new Avatars(f.username));
                 }

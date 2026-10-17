@@ -21,6 +21,8 @@ public class LoginActivity extends Activity {
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
+        // 必须在最前面：后面任何一处抛异常都能被记录
+        CrashGuard.install(this);
         Prefs.init(this);
         // WebView 通道要在任何请求之前初始化
         Api.applyHttpSwitch();
@@ -42,6 +44,9 @@ public class LoginActivity extends Activity {
 
         String u = Prefs.user();
         if (u != null && !u.isEmpty()) edUser.setText(u);
+
+        // 上次崩溃过：把堆栈显示出来，方便定位
+        showLastCrash();
 
         // 浏览器登录后跳回来的 xfan://auth?... 优先处理
         if (handleDeepLink(getIntent())) {
@@ -283,6 +288,36 @@ public class LoginActivity extends Activity {
     private void enterMain() {
         startActivity(new Intent(this, MainActivity.class));
         finish();
+    }
+
+    private void showLastCrash() {
+        final String log = CrashGuard.last(this);
+        if (log.isEmpty()) return;
+        CrashGuard.clear(this);
+        final android.widget.TextView tv = new android.widget.TextView(this);
+        tv.setText(log);
+        tv.setTextIsSelectable(true);
+        tv.setTextSize(10);
+        tv.setTextColor(0xFFFF6666);
+        android.widget.ScrollView sv = new android.widget.ScrollView(this);
+        sv.setPadding(14, 10, 14, 10);
+        sv.addView(tv);
+        try {
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("上次崩溃信息（长按可复制）")
+                    .setView(sv)
+                    .setNegativeButton(R.string.btn_close, null)
+                    .setNeutralButton("复制到剪贴板", new android.content.DialogInterface.OnClickListener() {
+                        public void onClick(android.content.DialogInterface d, int w) {
+                            android.content.ClipboardManager cm =
+                                    (android.content.ClipboardManager) getSystemService(
+                                            android.content.Context.CLIPBOARD_SERVICE);
+                            cm.setText(log);
+                            Toast.makeText(LoginActivity.this, "已复制", Toast.LENGTH_SHORT).show();
+                        }
+                    })
+                    .show();
+        } catch (Exception ignore) {}
     }
 
     private void toast(final String s) {

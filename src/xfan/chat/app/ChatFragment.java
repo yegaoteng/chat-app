@@ -478,7 +478,7 @@ public class ChatFragment extends Fragment {
                                     new android.widget.ImageView(getActivity());
                             thumb.setLayoutParams(new LinearLayout.LayoutParams(120, 120));
                             thumb.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
-                            new ImgLoader(thumb).load(Api.absUrl(u));
+                            new ImgLoader(thumb).load(Api.absUrl(u), 200, 200);
 
                             TextView t = new TextView(getActivity());
                             t.setText(nm);
