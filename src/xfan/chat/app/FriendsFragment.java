@@ -141,6 +141,16 @@ public class FriendsFragment extends Fragment {
         loadFriends();
     }
 
+    /** 失败时说明原因，避免界面停在“加载中”却毫无反馈 */
+    private void why(JSONObject r) {
+        String msg = (r == null)
+                ? ("网络错误\n" + Api.lastUrl + "\n" + Api.lastError)
+                : r.optString("error", "加载失败");
+        if (getActivity() != null)
+            android.widget.Toast.makeText(getActivity(), msg,
+                    android.widget.Toast.LENGTH_LONG).show();
+    }
+
     private void loadChannels() {
         new Thread(new Runnable() {
             public void run() {
@@ -148,7 +158,7 @@ public class FriendsFragment extends Fragment {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
-                        if (r == null || !r.optBoolean("success", false)) return;
+                        if (r == null || !r.optBoolean("success", false)) { why(r); return; }
                         JSONArray arr = r.optJSONArray("channels");
                         if (arr == null) return;
                         chans.clear();
@@ -176,7 +186,7 @@ public class FriendsFragment extends Fragment {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
-                        if (r == null || !r.optBoolean("success", false)) return;
+                        if (r == null || !r.optBoolean("success", false)) { why(r); return; }
                         JSONArray arr = r.optJSONArray("friends");
                         if (arr == null) return;
                         friends.clear();

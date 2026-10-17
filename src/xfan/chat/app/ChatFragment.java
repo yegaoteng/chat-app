@@ -168,7 +168,15 @@ public class ChatFragment extends Fragment {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
-                        if (r == null || !r.optBoolean("success", false)) return;
+                        if (r == null || !r.optBoolean("success", false)) {
+                            String why = (r == null)
+                                    ? ("网络错误\n" + Api.lastError)
+                                    : r.optString("error", "加载失败");
+                            if (getActivity() != null)
+                                android.widget.Toast.makeText(getActivity(), why,
+                                        android.widget.Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                         JSONArray arr = r.optJSONArray("messages");
                         if (arr == null) return;
                         List<Models.Msg> got = parse(arr);
@@ -205,8 +213,12 @@ public class ChatFragment extends Fragment {
         if (pollTask != null) { h.removeCallbacks(pollTask); pollTask = null; }
     }
 
+    private volatile boolean polling = false;
+
     private void pollOnce() {
         if (channelCode.isEmpty() && peer.isEmpty()) return;
+        if (polling) return;          // 上一个还没回来，跳过本次，避免线程堆积
+        polling = true;
         new Thread(new Runnable() {
             public void run() {
                 String url = mode.equals("channel")
@@ -216,10 +228,10 @@ public class ChatFragment extends Fragment {
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
-                        if (r == null) return;
-                        if (!r.optBoolean("success", false)) return;
+                        if (r == null) { polling = false; return; }
+                        if (!r.optBoolean("success", false)) { polling = false; return; }
                         JSONArray arr = r.optJSONArray("messages");
-                        if (arr == null || arr.length() == 0) return;
+                        if (arr == null || arr.length() == 0) { polling = false; return; }
                         boolean added = false;
                         for (Models.Msg m : parse(arr)) {
                             if (keys.contains(m.key())) continue;

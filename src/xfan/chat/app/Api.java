@@ -17,7 +17,8 @@ import java.util.Map;
 
 public class Api {
     private static final String TAG = "XFAN";
-    private static final int TIMEOUT = 15000;
+    // 轮询间隔 4 秒，超时必须更短，否则线程堆积、界面永远刷新不动
+    private static final int TIMEOUT = 8000;
 
     /** 最后一次实际请求的完整地址（失败时用于提示） */
     public static String lastUrl = "";
@@ -34,7 +35,7 @@ public class Api {
 
     // true = 走 WebView 发请求（浏览器身份，可绕过 WAF 验证）
     // 需要服务器上同时存在 bridge.html
-    public static boolean USE_WEBVIEW = true;
+    public static boolean USE_WEBVIEW = false;
 
     // true = 用 http:// 而非 https://（部分网关只对 https 做验证）
     public static boolean USE_HTTP = false;
@@ -51,6 +52,19 @@ public class Api {
 
     /** 记一次失败原因，便于在界面上集中展示 */
     public static void noteError(String s) { lastError = s; }
+
+    private static int webFail = 0;
+
+    /** 并发闸门：在途请求上限，防止轮询把线程池堆满 */
+    private static final java.util.concurrent.Semaphore GATE =
+            new java.util.concurrent.Semaphore(3);
+
+    private static boolean gate() {
+        try { return GATE.tryAcquire(6, java.util.concurrent.TimeUnit.SECONDS); }
+        catch (Exception e) { return false; }
+    }
+
+    private static void gateRelease() { GATE.release(); }
 
     private static Context ctxRef;
 
@@ -123,17 +137,25 @@ public class Api {
     /** GET 请求，返回 JSONObject；失败返回 null */
     public static JSONObject get(String path) {
         if (USE_WEBVIEW) {
-            String raw = webGet(abs(path));
             lastUrl = abs(path);
-            if (raw == null) { lastError = "WebView 请求失败（桥未就绪或超时）"; return null; }
-            try { return new JSONObject(raw); }
-            catch (Exception je) {
-                lastError = "WebView 返回非 JSON：\n"
-                        + (raw.length() > 200 ? raw.substring(0, 200) + "…" : raw);
-                // 桥拿不到数据时退回直连，避免整站不可用
-                Log.w(TAG, "WebView 通道失败，回退直连");
+            String raw = null;
+            try { raw = webGet(lastUrl); }
+            catch (Throwable t) { raw = null; }
+            if (raw != null) {
+                try { return new JSONObject(raw); }
+                catch (Exception je) {
+                    lastError = "WebView 返回非 JSON：\n"
+                            + (raw.length() > 200 ? raw.substring(0, 200) + "…" : raw);
+                }
+            } else {
+                lastError = "WebView 无响应（桥未就绪/bridge.html 缺失/超时）";
             }
+            // 无论哪种失败都回退直连，绝不把请求卡死在桥上
+            webFail++;
+            if (webFail >= 3) { USE_WEBVIEW = false; }
+            Log.w(TAG, "WebView 通道失败（第" + webFail + "次），回退直连");
         }
+        if (!gate()) { lastError = "请求过多已排队，稍后重试"; return null; }
         try {
             lastUrl = abs(path);
             HttpURLConnection c = conn(lastUrl, "GET");
@@ -151,6 +173,8 @@ public class Api {
             lastError = errText(e);
             Log.w(TAG, "GET " + path + " failed: " + e);
             return null;
+        } finally {
+            gateRelease();
         }
     }
 
