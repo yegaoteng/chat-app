@@ -25,6 +25,11 @@ public class Prefs {
     public static String token() { return get("token", ""); }
     public static void token(String v) { put("token", v); }
 
+    // 服务器浏览器验证下发的 __test cookie。
+    // 直连会被网关拦截时，带上它可复用浏览器已通过的验证身份。
+    public static String testCookie() { return get("__test", ""); }
+    public static void testCookie(String v) { put("__test", v); }
+
     public static String user() { return get("user", ""); }
     public static void user(String v) { put("user", v); }
 
@@ -43,5 +48,6 @@ public class Prefs {
     public static void clearSession() {
         put("token", "");
         put("pass", "");
+        put("__test", "");
     }
 }

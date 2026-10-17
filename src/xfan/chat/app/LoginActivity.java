@@ -14,7 +14,7 @@ import org.json.JSONObject;
 public class LoginActivity extends Activity {
 
     private EditText edUser, edPass, edInvite;
-    private Button btnLogin, btnRegister;
+    private Button btnLogin, btnRegister, btnWeb;
     private TextView tvTip;
     private boolean regMode = false;
 
@@ -31,13 +31,28 @@ public class LoginActivity extends Activity {
         btnRegister = findViewById(R.id.btnRegister);
         tvTip    = findViewById(R.id.tvTip);
 
+        btnWeb = findViewById(R.id.btnWeb);
+
         String u = Prefs.user();
         if (u != null && !u.isEmpty()) edUser.setText(u);
+
+        // 浏览器登录后跳回来的 xfan://auth?... 优先处理
+        if (handleDeepLink(getIntent())) {
+            enterMain();
+            return;
+        }
 
         // 已保存 token 直接尝试进入
         if (!Prefs.token().isEmpty()) {
             enterMain();
         }
+
+        btnWeb.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { openWebLogin(); }
+        });
+        btnWeb.setOnLongClickListener(new View.OnLongClickListener() {
+            public boolean onLongClick(View v) { pasteLoginInfo(); return true; }
+        });
 
         btnLogin.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { doLogin(); }
@@ -70,6 +85,55 @@ public class LoginActivity extends Activity {
                 return false;
             }
         });
+    }
+
+    /** 浏览器登录成功后跳回：xfan://auth?token=xxx&user=yyy&test=zzz */
+    private boolean handleDeepLink(Intent it) {
+        if (it == null || it.getData() == null) return false;
+        android.net.Uri d = it.getData();
+        if (!"xfan".equals(d.getScheme())) return false;
+
+        String token = d.getQueryParameter("token");
+        String user  = d.getQueryParameter("user");
+        String test  = d.getQueryParameter("test");
+        if (token == null || token.isEmpty()) return false;
+
+        Prefs.token(token);
+        if (user != null && !user.isEmpty()) Prefs.user(user);
+        if (test != null && !test.isEmpty()) Prefs.testCookie(test);
+        toast("登录成功");
+        return true;
+    }
+
+    /** 跳浏览器登录页（浏览器能通过 WAF 验证） */
+    private void openWebLogin() {
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW,
+                    android.net.Uri.parse(Api.base() + "/login_bridge.php"));
+            startActivity(i);
+        } catch (Exception e) {
+            toast("无法打开浏览器");
+        }
+    }
+
+    /** 兜底：粘贴网页端复制的 xfan://auth?... 整串 */
+    private void pasteLoginInfo() {
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        CharSequence cs = cm != null ? cm.getText() : null;
+        if (cs == null || cs.length() == 0) { toast("剪贴板为空"); return; }
+        String txt = cs.toString().trim();
+        if (!txt.startsWith("xfan://")) { toast("剪贴板内容不是登录信息"); return; }
+        if (handleDeepLink(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(txt)))) {
+            enterMain();
+        }
+    }
+
+    /** App 已在栈顶时被浏览器回调 */
+    @Override
+    protected void onNewIntent(Intent it) {
+        super.onNewIntent(it);
+        if (handleDeepLink(it)) enterMain();
     }
 
     private boolean checkInput() {

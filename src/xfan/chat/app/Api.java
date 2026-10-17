@@ -75,10 +75,16 @@ public class Api {
         c.setConnectTimeout(TIMEOUT);
         c.setReadTimeout(TIMEOUT);
         c.setUseCaches(false);
+        // Cookie 拼装：验证 cookie(__test) + 会话 cookie(chat_token)
+        StringBuilder ck = new StringBuilder();
+        String tv = Prefs.testCookie();
+        if (tv != null && !tv.isEmpty()) ck.append("__test=").append(tv);
         String t = Prefs.token();
         if (t != null && !t.isEmpty()) {
-            c.setRequestProperty("Cookie", "chat_token=" + t);
+            if (ck.length() > 0) ck.append("; ");
+            ck.append("chat_token=").append(t);
         }
+        if (ck.length() > 0) c.setRequestProperty("Cookie", ck.toString());
         c.setRequestProperty("User-Agent",
                 "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 "
                         + "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");

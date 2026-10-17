@@ -86,11 +86,22 @@
             android:textColor="@color/text"
             android:textSize="16sp" />
 
+        <Button
+            android:id="@+id/btnWeb"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_card"
+            android:text="@string/btn_web_login"
+            android:textColor="@color/text_sub"
+            android:textSize="14sp" />
+
         <TextView
             android:id="@+id/tvTip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
+            android:text="@string/web_login_tip"
             android:textColor="@color/text_sub"
             android:textSize="12sp" />
     </LinearLayout>
