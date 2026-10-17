@@ -286,8 +286,16 @@ public class LoginActivity extends Activity {
     }
 
     private void toast(final String s) {
-        runOnUiThread(new Runnable() {
+        ui(new Runnable() {
             public void run() { Toast.makeText(LoginActivity.this, s, Toast.LENGTH_SHORT).show(); }
+        });
+    }
+
+    /** UI 线程执行，自动跳过已销毁状态（避免跳主界面时闪退） */
+    private void ui(final Runnable r) {
+        if (isFinishing()) return;
+        runOnUiThread(new Runnable() {
+            public void run() { if (!isFinishing()) r.run(); }
         });
     }
 }

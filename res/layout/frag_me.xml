@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg">
+    >
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -59,15 +59,27 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btnSign"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/bg_btn"
-            android:text="@string/sec_sign"
-            android:textColor="@color/text_light"
-            android:textSize="15sp" />
+            android:layout_marginTop="12dp">
+
+            <Button
+                android:id="@+id/btnSign"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_btn"
+                android:text="@string/sec_sign"
+                android:textColor="@color/text_light"
+                android:textSize="15sp" />
+
+            <ProgressBar
+                android:id="@+id/pbSign"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+        </FrameLayout>
 
         <Button
             android:id="@+id/btnInvite"

@@ -46,14 +46,24 @@ public class FriendsFragment extends Fragment {
             public Object getItem(int p) { return chans.get(p); }
             public long getItemId(int p) { return p; }
             public View getView(int p, View cv, ViewGroup parent) {
-                TextView t = (cv instanceof TextView) ? (TextView) cv : new TextView(getActivity());
+                if (cv == null || !(cv.findViewById(R.id.tvIcon) instanceof TextView)) {
+                    cv = LayoutInflater.from(getActivity())
+                            .inflate(R.layout.item_channel, parent, false);
+                }
                 Models.Channel ch = chans.get(p);
-                t.setText((ch.unread > 0 ? "● " : "") + ch.name);
-                t.setTextColor(getResources().getColor(
-                        ch.unread > 0 ? R.color.accent : R.color.text));
-                t.setTextSize(13);
-                t.setPadding(6, 10, 6, 10);
-                return t;
+                TextView icon = cv.findViewById(R.id.tvIcon);
+                TextView name = cv.findViewById(R.id.tvName);
+                TextView unread = cv.findViewById(R.id.tvUnread);
+                icon.setText("#");
+                name.setText(ch.name);
+                name.setTextColor(ThemeEngine.themeText());
+                if (ch.unread > 0) {
+                    unread.setVisibility(View.VISIBLE);
+                    unread.setText(String.valueOf(ch.unread));
+                } else {
+                    unread.setVisibility(View.GONE);
+                }
+                return cv;
             }
         };
         lvChannel.setAdapter(chAd);
@@ -88,14 +98,10 @@ public class FriendsFragment extends Fragment {
                 if (!url.isEmpty()) {
                     new ImgLoader(av).load(Api.absUrl(url));
                 } else {
-                    int hue = Math.abs(f.username.hashCode()) % 360;
-                    android.graphics.drawable.ShapeDrawable sd =
-                            new android.graphics.drawable.ShapeDrawable(
-                                    new android.graphics.drawable.shapes.OvalShape());
-                    sd.getPaint().setColor(android.graphics.Color.HSVToColor(
-                            new float[]{hue, 0.55f, 0.85f}));
-                    av.setBackgroundDrawable(sd);
+                    av.setImageDrawable(new Avatars(f.username));
                 }
+                ThemeEngine.applyNameColor(name, null);
+                last.setTextColor(ThemeEngine.themeTextSub());
                 return cv;
             }
         };
@@ -125,6 +131,25 @@ public class FriendsFragment extends Fragment {
             public void onClick(View v2) { showRequests(); }
         });
         return v;
+    }
+
+    /** 应用个性化主题 */
+    public void applyTheme() {
+        View v = getView();
+        if (v == null) return;
+        try {
+            View cb = v.findViewById(R.id.chanBar);
+            View fb = v.findViewById(R.id.friendBar);
+            if (cb != null) cb.setBackgroundColor(ThemeEngine.themePanel());
+            if (fb != null) fb.setBackgroundColor(ThemeEngine.themePanel());
+        } catch (Exception ignore) {}
+        if (chAd != null) chAd.notifyDataSetChanged();
+        if (frAd != null) frAd.notifyDataSetChanged();
+    }
+
+    /** 资料回来后刷新（昵称颜色等） */
+    public void applyProfile(JSONObject r) {
+        applyTheme();
     }
 
     public void onShow() { load(); }
@@ -213,7 +238,8 @@ public class FriendsFragment extends Fragment {
 
     private void setLvHeight(ListView lv, int n) {
         if (n <= 0) return;
-        int h = (int) (46 * n * getResources().getDisplayMetrics().density);
+        int rows = Math.min(n, 5);
+        int h = (int) (56 * rows * getResources().getDisplayMetrics().density);
         LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) lv.getLayoutParams();
         lp.height = h;
         lv.setLayoutParams(lp);

@@ -26,6 +26,7 @@ public class MeFragment extends Fragment {
     private ImageView ivAvatar;
     private TextView tvName, tvBio, tvPts, tvVer;
     private Button btnSign, btnInvite, btnBio, btnUploads, btnRename, btnAvatar, btnLogout;
+    private android.widget.ProgressBar pbSign;
     private String inviteCode = "";
     private String bio = "";
     private boolean signed = false;
@@ -41,6 +42,7 @@ public class MeFragment extends Fragment {
         tvPts = v.findViewById(R.id.tvPts);
         tvVer = v.findViewById(R.id.tvVer);
         btnSign = v.findViewById(R.id.btnSign);
+        pbSign = v.findViewById(R.id.pbSign);
         btnInvite = v.findViewById(R.id.btnInvite);
         btnBio = v.findViewById(R.id.btnBio);
         btnUploads = v.findViewById(R.id.btnUploads);
@@ -93,6 +95,7 @@ public class MeFragment extends Fragment {
                         }).show();
             }
         });
+        applyTheme();
         return v;
     }
 
@@ -112,28 +115,54 @@ public class MeFragment extends Fragment {
 
         String av = r.optString("avatar", "");
         if (!av.isEmpty()) new ImgLoader(ivAvatar).load(Api.absUrl(av));
+        else if (ivAvatar != null) ivAvatar.setImageDrawable(new Avatars(name));
+        applyTheme();
     }
 
     private void doSign() {
+        if (btnSign == null) return;
+        final String oldText = btnSign.getText().toString();
         btnSign.setEnabled(false);
+        btnSign.setText("签到中…");
+        if (pbSign != null) pbSign.setVisibility(View.VISIBLE);
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.post("user.php?action=sign_in", new JSONObject());
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
+                        if (btnSign == null) return;
+                        if (pbSign != null) pbSign.setVisibility(View.GONE);
                         if (r != null && r.optBoolean("success", false)) {
                             toast("签到成功 +" + r.optInt("reward", 50));
+                            signed = true;
                             btnSign.setText("今日已签到");
                         } else {
-                            toast(r == null ? "网络错误" : r.optString("error", "签到失败"));
+                            toast(r == null ? ("网络错误\n" + Api.lastError)
+                                    : r.optString("error", "签到失败"));
                             btnSign.setEnabled(true);
+                            btnSign.setText(signed ? "今日已签到" : oldText);
                         }
                         if (host != null) host.refreshPoints();
                     }
                 });
             }
         }).start();
+    }
+
+    /** 应用个性化主题 */
+    public void applyTheme() {
+        View v = getView();
+        if (v == null) return;
+        try {
+            v.setBackgroundColor(ThemeEngine.themeBg() == -1 ? 0x00000000 : ThemeEngine.themeBg());
+            if (tvName != null) {
+                tvName.setTextColor(ThemeEngine.themeText());
+                ThemeEngine.applyNameColor(tvName, null);
+            }
+            if (tvBio != null) tvBio.setTextColor(ThemeEngine.themeTextSub());
+            if (tvPts != null) tvPts.setTextColor(ThemeEngine.themeTextSub());
+        } catch (Exception ignore) {}
     }
 
     private void editBio() {

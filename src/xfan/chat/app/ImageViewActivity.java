@@ -42,13 +42,9 @@ public class ImageViewActivity extends Activity {
         new Thread(new Runnable() {
             public void run() {
                 try {
-                    HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-                    c.setConnectTimeout(10000);
-                    c.setReadTimeout(10000);
-                    c.connect();
-                    InputStream in = c.getInputStream();
-                    final Bitmap bm = BitmapFactory.decodeStream(in);
-                    in.close();
+                    // 走 ImgLoader：带浏览器头与验证 cookie，否则会被 WAF 拦下
+                    final Bitmap bm = ImgLoader.fetch(url);
+                    if (bm == null) throw new Exception("null");
                     runOnUiThread(new Runnable() {
                         public void run() { iv.setImageBitmap(bm); }
                     });

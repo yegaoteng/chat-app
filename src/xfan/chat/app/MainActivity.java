@@ -7,9 +7,13 @@ import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.view.animation.ScaleAnimation;
 import android.view.animation.TranslateAnimation;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,14 +37,28 @@ public class MainActivity extends Activity {
 
     public static MainActivity self;
 
+    /** 内置样式目录：网络不通时个性化依然可切换 */
+    private static JSONArray builtin(String kind) throws Exception {
+        if ("theme".equals(kind)) return new JSONArray()
+                .put(new JSONObject().put("key", "default").put("name", "默认").put("price", 0))
+                .put(new JSONObject().put("key", "gold").put("name", "金辉红框").put("price", 1000));
+        if ("bubble".equals(kind)) return new JSONArray()
+                .put(new JSONObject().put("key", "default").put("name", "默认").put("price", 0))
+                .put(new JSONObject().put("key", "golden").put("name", "金色华章").put("price", 2500))
+                .put(new JSONObject().put("key", "rainbow").put("name", "七色流彩").put("price", 6500));
+        return new JSONArray()
+                .put(new JSONObject().put("key", "default").put("name", "默认").put("price", 0))
+                .put(new JSONObject().put("key", "gold").put("name", "金色").put("price", 300))
+                .put(new JSONObject().put("key", "rainbow_static").put("name", "七彩渐变·静态").put("price", 800))
+                .put(new JSONObject().put("key", "rainbow_dynamic").put("name", "七彩渐变·动态").put("price", 1299));
+    }
+
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Prefs.init(this);
-        // WebView 通道要在任何请求之前初始化
         Api.applyHttpSwitch();
         Api.bindContext(this);
-        // 后台借用 WebView 完成浏览器验证，把 __test 回灌给直连
         new Thread(new Runnable() {
             public void run() { Api.syncWebCookies(MainActivity.this); }
         }).start();
@@ -80,9 +98,29 @@ public class MainActivity extends Activity {
         tabFriends.setOnClickListener(tabClick);
         tabMe.setOnClickListener(tabClick);
 
+        applyTheme();
         switchTab(0);
         loadProfile();
         UpdateManager.check(this);
+    }
+
+    /** 应用个性化主题到整个界面 */
+    public void applyTheme() {
+        ThemeEngine.applyActivity(this);
+        if (fChat != null) fChat.applyTheme();
+        if (fFriends != null) fFriends.applyTheme();
+        if (fMe != null) fMe.applyTheme();
+    }
+
+    /** UI 线程执行，自动跳过已销毁状态 */
+    private void ui(Runnable r) {
+        if (isFinishing()) return;
+        runOnUiThread(new Runnable() {
+            public void run() {
+                if (isFinishing()) return;
+                r.run();
+            }
+        });
     }
 
     @Override
@@ -91,11 +129,23 @@ public class MainActivity extends Activity {
         super.onBackPressed();
     }
 
-    // ---------- 页面切换 ----------
+    // ---------- 页面切换（带过渡动画）----------
     private void switchTab(int t) {
+        if (t == curTab && fChat != null && fChat.isAdded() && !fChat.isHidden()
+                && t == 0) {
+            // 重复点当前页：不重播动画
+            return;
+        }
+        boolean toRight = t >= curTab;
+        final int prev = curTab;
         curTab = t;
+
         Fragment f = (t == 0) ? fChat : (t == 1 ? fFriends : fMe);
         FragmentTransaction ft = getFragmentManager().beginTransaction();
+        // 按切换方向选择滑入/滑出，让底部栏目切换有明确的空间感
+        ft.setCustomAnimations(
+                toRight ? R.anim.slide_in_right : R.anim.slide_in_left,
+                toRight ? R.anim.slide_out_left : R.anim.slide_out_right);
         if (!f.isAdded()) ft.add(R.id.content, f, "tab" + t);
         if (fChat.isAdded()) ft.hide(fChat);
         if (fFriends.isAdded()) ft.hide(fFriends);
@@ -108,20 +158,46 @@ public class MainActivity extends Activity {
         tabChat.setTextColor(t == 0 ? on : off);
         tabFriends.setTextColor(t == 1 ? on : off);
         tabMe.setTextColor(t == 2 ? on : off);
+        popTab(t == 0 ? tabChat : (t == 1 ? tabFriends : tabMe));
 
         tvTitle.setText(t == 0 ? getString(R.string.tab_chat)
                 : t == 1 ? getString(R.string.tab_friends) : getString(R.string.tab_me));
 
-        if (t == 0) fChat.onShow();
-        if (t == 1) fFriends.onShow();
-        if (t == 2) fMe.onShow();
+        if (t == 0) safeShow(fChat);
+        if (t == 1) safeShow(fFriends);
+        if (t == 2) safeShow(fMe);
+    }
+
+    /** fragment 可能尚未完成 add，延后一帧再回调，避免空指针 */
+    private void safeShow(final Fragment f) {
+        if (f == null) return;
+        findViewById(android.R.id.content).post(new Runnable() {
+            public void run() {
+                try {
+                    if (f instanceof ChatFragment) ((ChatFragment) f).onShow();
+                    else if (f instanceof FriendsFragment) ((FriendsFragment) f).onShow();
+                    else if (f instanceof MeFragment) ((MeFragment) f).onShow();
+                } catch (Exception ignore) {}
+            }
+        });
+    }
+
+    /** 选中标签的弹跳反馈 */
+    private void popTab(View v) {
+        if (v == null) return;
+        ScaleAnimation sa = new ScaleAnimation(0.86f, 1.06f, 0.86f, 1.06f,
+                Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        sa.setDuration(150);
+        sa.setRepeatMode(Animation.REVERSE);
+        sa.setRepeatCount(1);
+        v.startAnimation(sa);
     }
 
     public void gotoChat() { switchTab(0); }
 
     public void tvTitleSet(final String s) {
-        runOnUiThread(new Runnable() {
-            public void run() { tvTitle.setText(s); }
+        ui(new Runnable() {
+            public void run() { if (tvTitle != null) tvTitle.setText(s); }
         });
     }
 
@@ -160,7 +236,7 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=profile");
-                runOnUiThread(new Runnable() {
+                ui(new Runnable() {
                     public void run() {
                         if (r == null || !r.optBoolean("success", false)) return;
                         final int pts = r.optInt("points", 0);
@@ -168,9 +244,11 @@ public class MainActivity extends Activity {
                         Prefs.theme(r.optString("theme", "default"));
                         Prefs.bubble(r.optString("bubble", "default"));
                         Prefs.namecolor(r.optString("namecolor", "default"));
-                        tvPoints.setText(pts + " 分");
+                        if (tvPoints != null) tvPoints.setText(pts + " 分");
+                        applyTheme();
                         if (fMe != null) fMe.applyProfile(r);
                         if (fChat != null) fChat.applyProfile(r);
+                        if (fFriends != null) fFriends.applyProfile(r);
                     }
                 });
             }
@@ -179,25 +257,30 @@ public class MainActivity extends Activity {
 
     public void refreshPoints() { loadProfile(); }
 
-    // ---------- 抽屉内容：主题 / 气泡 / 名称颜色 / 签到 / 兑换 / 公告 ----------
+    // ---------- 抽屉内容 ----------
+    // 顺序：个性化（立即可用）→ 签到 → 兑换 → 公告（可慢慢加载）
     private void loadDrawer() {
         drawerBody.removeAllViews();
+        addStyleSection(getString(R.string.sec_theme), null, null, "theme", "unlocked_themes");
+        addStyleSection(getString(R.string.sec_bubble), null, null, "bubble", "unlocked_bubbles");
+        addStyleSection(getString(R.string.sec_namecolor), null, null, "namecolor", "unlocked_namecolors");
         addSignSection();
         addRedeemSection();
         addAnnSection();
+
+        // 异步拉取真实目录（含解锁状态），拿到后只刷新个性化这三块
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=style_catalog");
-                runOnUiThread(new Runnable() {
+                ui(new Runnable() {
                     public void run() {
                         if (r == null) return;
                         JSONArray th = r.optJSONArray("themes");
                         JSONArray bb = r.optJSONArray("bubbles");
                         JSONArray nc = r.optJSONArray("namecolors");
                         JSONObject mine = r.optJSONObject("mine");
-                        addStyleSection(getString(R.string.sec_theme), th, mine, "theme", "unlocked_themes");
-                        addStyleSection(getString(R.string.sec_bubble), bb, mine, "bubble", "unlocked_bubbles");
-                        addStyleSection(getString(R.string.sec_namecolor), nc, mine, "namecolor", "unlocked_namecolors");
+                        if (th == null && bb == null && nc == null) return;
+                        rebuildStyles(th, bb, nc, mine);
                     }
                 });
             }
@@ -214,27 +297,68 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    /** 用真实目录重建个性化区块，插到最前面 */
+    private void rebuildStyles(JSONArray th, JSONArray bb, JSONArray nc, JSONObject mine) {
+        List<View> keep = new ArrayList<View>();
+        // 保留个性化之后的部分（签到 / 兑换 / 公告）
+        int n = drawerBody.getChildCount();
+        boolean afterStyles = false;
+        for (int i = 0; i < n; i++) {
+            View v = drawerBody.getChildAt(i);
+            Object tag = v.getTag();
+            if (tag instanceof String && ((String) tag).startsWith("style:")) continue;
+            if (tag instanceof String && ((String) tag).equals("styleTail")) afterStyles = true;
+            if (afterStyles) keep.add(v);
+        }
+        drawerBody.removeAllViews();
+        addStyleSection(getString(R.string.sec_theme), th, mine, "theme", "unlocked_themes");
+        addStyleSection(getString(R.string.sec_bubble), bb, mine, "bubble", "unlocked_bubbles");
+        addStyleSection(getString(R.string.sec_namecolor), nc, mine, "namecolor", "unlocked_namecolors");
+        for (View v : keep) drawerBody.addView(v);
+    }
+
+    private void markStyle(View v, String kind) { v.setTag("style:" + kind); }
+
     private void addSignSection() {
         drawerBody.addView(sectionTitle(getString(R.string.sec_sign)));
+        final LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
         final TextView btn = new TextView(this);
         btn.setText("每日签到 (+50)");
         btn.setTextColor(getResources().getColor(R.color.text_drawer));
         btn.setTextSize(14);
         btn.setPadding(10, 12, 10, 12);
+        btn.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        final ProgressBar pb = new ProgressBar(this);
+        pb.setVisibility(View.GONE);
+        pb.setLayoutParams(new LinearLayout.LayoutParams(36, 36));
+
+        row.addView(btn);
+        row.addView(pb);
+        row.setTag("styleTail");
+        drawerBody.addView(row);
+
         btn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { doSign(btn); }
+            public void onClick(View v) { doSign(btn, pb); }
         });
-        drawerBody.addView(btn);
     }
 
-    private void doSign(final TextView btn) {
+    private void doSign(final TextView btn, final ProgressBar pb) {
         btn.setEnabled(false);
+        btn.setText("签到中…");
+        pb.setVisibility(View.VISIBLE);
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.post("user.php?action=sign_in", new JSONObject());
-                runOnUiThread(new Runnable() {
+                ui(new Runnable() {
                     public void run() {
+                        pb.setVisibility(View.GONE);
                         btn.setEnabled(true);
+                        btn.setText("每日签到 (+50)");
                         if (r == null) { toast("网络错误"); return; }
                         toast(r.optBoolean("success", false)
                                 ? ("签到成功 +" + r.optInt("reward", 50))
@@ -270,7 +394,7 @@ public class MainActivity extends Activity {
                         JSONObject b = new JSONObject();
                         try { b.put("code", code); } catch (Exception ignore) {}
                         final JSONObject r = Api.post("user.php?action=redeem", b);
-                        runOnUiThread(new Runnable() {
+                        ui(new Runnable() {
                             public void run() {
                                 if (r == null) { toast("网络错误"); return; }
                                 toast(r.optBoolean("success", false)
@@ -297,9 +421,9 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=announcements");
-                runOnUiThread(new Runnable() {
+                ui(new Runnable() {
                     public void run() {
-                        if (r == null) { body.setText("加载失败"); return; }
+                        if (r == null) { body.setText("暂无公告"); return; }
                         JSONArray arr = r.optJSONArray("list");
                         if (arr == null || arr.length() == 0) { body.setText("暂无公告"); return; }
                         StringBuilder sb = new StringBuilder();
@@ -316,10 +440,14 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private void addStyleSection(String title, final JSONArray arr, JSONObject mine,
+    private void addStyleSection(String title, JSONArray arr, JSONObject mine,
                                  final String kind, String unlockedKey) {
-        if (arr == null || arr.length() == 0) return;
+        JSONArray list = arr;
+        if (list == null || list.length() == 0) {
+            try { list = builtin(kind); } catch (Exception e) { return; }
+        }
         List<String> owned = new ArrayList<String>();
+        owned.add("default");
         if (mine != null) {
             JSONArray ua = mine.optJSONArray(unlockedKey);
             if (ua != null) for (int i = 0; i < ua.length(); i++) owned.add(ua.optString(i, ""));
@@ -327,9 +455,12 @@ public class MainActivity extends Activity {
         final String cur = kind.equals("theme") ? Prefs.theme()
                 : kind.equals("bubble") ? Prefs.bubble() : Prefs.namecolor();
 
-        drawerBody.addView(sectionTitle(title));
-        for (int i = 0; i < arr.length(); i++) {
-            final JSONObject it = arr.optJSONObject(i);
+        TextView titleView = sectionTitle(title);
+        markStyle(titleView, kind);
+        drawerBody.addView(titleView);
+
+        for (int i = 0; i < list.length(); i++) {
+            final JSONObject it = list.optJSONObject(i);
             if (it == null) continue;
             final String key = it.optString("key", "");
             final int price = it.optInt("price", 0);
@@ -343,9 +474,8 @@ public class MainActivity extends Activity {
             row.setTextColor(getResources().getColor(R.color.text_drawer));
             row.setTextSize(13);
             row.setPadding(12, 10, 12, 10);
-            if (key.equals(cur)) {
-                row.setBackgroundColor(0x225FE3F0);
-            }
+            if (key.equals(cur)) row.setBackgroundColor(0x225FE3F0);
+            markStyle(row, kind);
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { setStyle(kind, key, has, price); }
             });
@@ -374,7 +504,7 @@ public class MainActivity extends Activity {
                 JSONObject b = new JSONObject();
                 try { b.put("kind", kind); b.put("key", key); } catch (Exception ignore) {}
                 final JSONObject r = Api.post("user.php?action=style_set", b);
-                runOnUiThread(new Runnable() {
+                ui(new Runnable() {
                     public void run() {
                         if (r == null) { toast("网络错误"); return; }
                         if (!r.optBoolean("success", false)) {
@@ -384,7 +514,9 @@ public class MainActivity extends Activity {
                         if (kind.equals("theme")) Prefs.theme(key);
                         else if (kind.equals("bubble")) Prefs.bubble(key);
                         else Prefs.namecolor(key);
-                        toast("已设置");
+                        // 立即生效，不等下次拉取资料
+                        applyTheme();
+                        toast("已切换");
                         loadDrawer();
                         loadProfile();
                     }
@@ -394,8 +526,10 @@ public class MainActivity extends Activity {
     }
 
     public void toast(final String s) {
-        runOnUiThread(new Runnable() {
-            public void run() { Toast.makeText(MainActivity.this, s, Toast.LENGTH_SHORT).show(); }
+        ui(new Runnable() {
+            public void run() {
+                Toast.makeText(MainActivity.this, s, Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
