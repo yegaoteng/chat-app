@@ -42,6 +42,14 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tvUid"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/text_sub"
+                    android:textSize="11sp" />
+
+                <TextView
                     android:id="@+id/tvBio"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -98,16 +106,6 @@
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_card"
             android:text="@string/me_bio"
-            android:textColor="@color/text"
-            android:textSize="14sp" />
-
-        <Button
-            android:id="@+id/btnUploads"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_card"
-            android:text="@string/me_uploads"
             android:textColor="@color/text"
             android:textSize="14sp" />
 

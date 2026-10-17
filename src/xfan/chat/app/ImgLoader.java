@@ -1,5 +1,6 @@
 package xfan.chat.app;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
@@ -21,6 +22,47 @@ import java.net.URL;
  */
 public class ImgLoader {
     private static final Handler h = new Handler();
+
+    /** 磁盘缓存目录 + 24 小时有效期（切频道/私聊后已加载过的图直接本地取） */
+    private static java.io.File diskDir = null;
+    private static final long DISK_TTL = 24L * 60 * 60 * 1000;
+
+    public static void init(Context c) {
+        if (c == null) return;
+        try {
+            java.io.File d = new java.io.File(c.getCacheDir(), "imgcache");
+            if (!d.exists()) d.mkdirs();
+            diskDir = d;
+        } catch (Throwable ignore) {}
+    }
+
+    private static java.io.File diskFile(String url) {
+        if (diskDir == null || url == null) return null;
+        String k;
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
+            byte[] b = md.digest(url.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte x : b) sb.append(String.format("%02x", x));
+            k = sb.toString();
+        } catch (Exception e) {
+            k = String.valueOf(url.hashCode());
+        }
+        return new java.io.File(diskDir, k);
+    }
+
+    /** 清掉超过 24 小时的缓存文件 */
+    private static void trimDisk() {
+        if (diskDir == null) return;
+        try {
+            long now = System.currentTimeMillis();
+            java.io.File[] fs = diskDir.listFiles();
+            if (fs == null) return;
+            for (java.io.File f : fs) {
+                if (now - f.lastModified() > DISK_TTL) { try { f.delete(); } catch (Throwable ignore) {} }
+            }
+        } catch (Throwable ignore) {}
+    }
 
     /** 缓存上限：取可用内存的 1/8，最小 8MB */
     private static final int MAX_CACHE;
@@ -80,6 +122,20 @@ public class ImgLoader {
      */
     public static Bitmap fetch(String url, int maxW, int maxH) {
         if (url == null || url.isEmpty()) return null;
+
+        // 先查磁盘缓存（24 小时内有效）
+        java.io.File df = diskFile(url);
+        if (df != null && df.exists()
+                && System.currentTimeMillis() - df.lastModified() < DISK_TTL) {
+            Bitmap d = null;
+            try {
+                d = BitmapFactory.decodeFile(df.getAbsolutePath());
+            } catch (Throwable ignore) {
+                d = null;
+            }
+            if (d != null) { put(url, d); return d; }
+        }
+
         HttpURLConnection c = null;
         try {
             c = open(url);
@@ -105,6 +161,15 @@ public class ImgLoader {
             InputStream in = c.getInputStream();
             Bitmap bm = BitmapFactory.decodeStream(in, null, opt);
             try { in.close(); } catch (Throwable ignore) {}
+            if (bm != null && df != null) {
+                try {
+                    java.io.FileOutputStream fos = new java.io.FileOutputStream(df);
+                    bm.compress(Bitmap.CompressFormat.PNG, 90, fos);
+                    fos.flush();
+                    fos.close();
+                } catch (Throwable ignore) {}
+                trimDisk();
+            }
             return bm;
         } catch (OutOfMemoryError oom) {
             cache.evictAll();          // 内存吃紧时先清空缓存，后续图片还能救回来

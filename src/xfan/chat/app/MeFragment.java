@@ -24,10 +24,12 @@ public class MeFragment extends Fragment {
 
     public MainActivity host;
     private ImageView ivAvatar;
-    private TextView tvName, tvBio, tvPts, tvVer;
-    private Button btnSign, btnInvite, btnBio, btnUploads, btnRename, btnAvatar, btnLogout;
+    private TextView tvName, tvBio, tvPts, tvVer, tvUid;
+    private Button btnSign, btnInvite, btnBio, btnRename, btnAvatar, btnLogout;
     private android.widget.ProgressBar pbSign;
     private String inviteCode = "";
+    private String myUid = "";
+    private String avatarUrl = "";
     private String bio = "";
     private boolean signed = false;
 
@@ -39,13 +41,13 @@ public class MeFragment extends Fragment {
         ivAvatar = v.findViewById(R.id.ivAvatar);
         tvName = v.findViewById(R.id.tvName);
         tvBio = v.findViewById(R.id.tvBio);
+        tvUid = v.findViewById(R.id.tvUid);
         tvPts = v.findViewById(R.id.tvPts);
         tvVer = v.findViewById(R.id.tvVer);
         btnSign = v.findViewById(R.id.btnSign);
         pbSign = v.findViewById(R.id.pbSign);
         btnInvite = v.findViewById(R.id.btnInvite);
         btnBio = v.findViewById(R.id.btnBio);
-        btnUploads = v.findViewById(R.id.btnUploads);
         btnRename = v.findViewById(R.id.btnRename);
         btnAvatar = v.findViewById(R.id.btnAvatar);
         btnLogout = v.findViewById(R.id.btnLogout);
@@ -54,6 +56,11 @@ public class MeFragment extends Fragment {
             tvVer.setText("v" + getActivity().getPackageManager()
                     .getPackageInfo(getActivity().getPackageName(), 0).versionName);
         } catch (Exception ignore) {}
+
+        // 点头像 -> 全屏查看自己的头像
+        ivAvatar.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v2) { viewAvatar(); }
+        });
 
         btnSign.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) { doSign(); }
@@ -70,9 +77,6 @@ public class MeFragment extends Fragment {
         });
         btnBio.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) { editBio(); }
-        });
-        btnUploads.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v2) { showUploads(); }
         });
         btnRename.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) { editName(); }
@@ -118,8 +122,27 @@ public class MeFragment extends Fragment {
         pending = null;
         String name = r.optString("username", "");
         tvName.setText(name);
+        // 用户名下方显示注册 UID（稳定身份，改昵称不变）
+        myUid = r.optString("uid", "");
+        if (tvUid != null) {
+            tvUid.setText(myUid.isEmpty() ? "" : ("UID：" + myUid));
+        }
         tvPts.setText(r.optInt("points", 0) + " 分");
         inviteCode = r.optString("invite_code", "");
+        // 按钮上直接显示真实邀请码，不用点进去才知道
+        if (btnInvite != null) {
+            btnInvite.setText(inviteCode.isEmpty()
+                    ? getString(R.string.me_invite)
+                    : (getString(R.string.me_invite) + "（" + inviteCode + "）"));
+        }
+        // 改名按钮上提示当前是否可改
+        int left = r.optInt("rename_left", 0);
+        if (btnRename != null) {
+            btnRename.setText(left > 0
+                    ? (getString(R.string.me_rename) + "（还需 " + fmtLeft(left) + "）")
+                    : (getString(R.string.me_rename) + "（可修改）"));
+            btnRename.setEnabled(left <= 0);
+        }
         bio = r.optString("bio", "");
         tvBio.setText(bio.isEmpty() ? "这个人很懒，没有留下简介" : bio);
         signed = r.optBoolean("signed", false);
@@ -127,6 +150,7 @@ public class MeFragment extends Fragment {
         btnSign.setEnabled(!signed);
 
         String av = r.optString("avatar", "");
+        avatarUrl = av;
         if (!av.isEmpty()) new ImgLoader(ivAvatar).load(Api.absUrl(av), 200, 200);
         else if (ivAvatar != null) ivAvatar.setImageDrawable(new Avatars(name));
         applyTheme();
@@ -208,6 +232,16 @@ public class MeFragment extends Fragment {
                 }).show();
     }
 
+    /** 把剩余冷却秒数转成「x天x小时」 */
+    private String fmtLeft(int sec) {
+        if (sec <= 0) return "可修改";
+        int d = sec / 86400;
+        int h = (sec % 86400) / 3600;
+        if (d > 0) return d + " 天";
+        if (h > 0) return h + " 小时";
+        return Math.max(1, sec / 60) + " 分钟";
+    }
+
     private void editName() {
         final EditText ed = new EditText(getActivity());
         ed.setHint("2-20 个字符");
@@ -241,6 +275,18 @@ public class MeFragment extends Fragment {
                         }).start();
                     }
                 }).show();
+    }
+
+    /** 全屏查看自己的头像；没有头像时提示先上传 */
+    private void viewAvatar() {
+        if (avatarUrl == null || avatarUrl.isEmpty()) {
+            toast("还没有设置头像");
+            return;
+        }
+        try {
+            startActivity(new Intent(getActivity(), ImageViewActivity.class)
+                    .putExtra("url", Api.absUrl(avatarUrl)));
+        } catch (Exception ignore) {}
     }
 
     private void pickAvatar() {

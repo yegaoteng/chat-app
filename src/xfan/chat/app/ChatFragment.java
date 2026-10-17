@@ -56,6 +56,12 @@ public class ChatFragment extends Fragment {
     private static final int REQ_PICK = 101;
     private static final int REQ_PICK_AVATAR = 102;
 
+    /** 当前正在引用的消息 */
+    private Models.Msg quoting = null;
+    private View quoteBar;
+    private TextView quoteText;
+    private View loadingBar;
+
     @Override
     public View onCreateView(LayoutInflater inf, ViewGroup c, Bundle b) {
         View v = inf.inflate(R.layout.frag_chat, c, false);
@@ -64,11 +70,23 @@ public class ChatFragment extends Fragment {
         tvOnline = v.findViewById(R.id.tvOnline);
         pbSending = v.findViewById(R.id.pbSending);
         inputArea = v.findViewById(R.id.inputArea);
+        loadingBar = v.findViewById(R.id.loadingBar);
+        quoteBar = v.findViewById(R.id.quoteBar);
+        quoteText = v.findViewById(R.id.tvQuote);
+        View btnQuoteCancel = v.findViewById(R.id.btnQuoteCancel);
+        if (btnQuoteCancel != null) {
+            btnQuoteCancel.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v2) { clearQuote(); }
+            });
+        }
         Button btnSend = v.findViewById(R.id.btnSend);
         Button btnImg = v.findViewById(R.id.btnImg);
         Button btnUp = v.findViewById(R.id.btnUp);
 
         ad = new MsgAdapter(getActivity(), data);
+        ad.setOnImageClick(new MsgAdapter.OnImageClick() {
+            public void onImage(String content) { openImage(content); }
+        });
         lv.setAdapter(ad);
 
         btnSend.setOnClickListener(new View.OnClickListener() {
@@ -100,6 +118,15 @@ public class ChatFragment extends Fragment {
 
         applyTheme();
         return v;
+    }
+
+    /** 切换频道/私聊时显示「聊天数据加载中…」 */
+    private void showLoading(final boolean on) {
+        ui(new Runnable() {
+            public void run() {
+                if (loadingBar != null) loadingBar.setVisibility(on ? View.VISIBLE : View.GONE);
+            }
+        });
     }
 
     /** 应用主题到本页面（输入区 / 在线条） */
@@ -169,7 +196,9 @@ public class ChatFragment extends Fragment {
         channelCode = code;
         channelName = name;
         peer = "";
+        clearQuote();
         reset();
+        showLoading(true);
         loadHistory();
         if (host != null) { host.gotoChat(); host.tvTitleSet(name); }
     }
@@ -178,7 +207,9 @@ public class ChatFragment extends Fragment {
         mode = "pm";
         peer = who;
         channelCode = "";
+        clearQuote();
         reset();
+        showLoading(true);
         loadHistory();
         if (host != null) { host.gotoChat(); host.tvTitleSet("与 " + who + " 私聊"); }
     }
@@ -214,12 +245,14 @@ public class ChatFragment extends Fragment {
                 ui(new Runnable() {
                     public void run() {
                         if (r == null || !r.optBoolean("success", false)) {
+                            showLoading(false);
                             String why = (r == null)
                                     ? ("加载失败\n" + Api.lastError)
                                     : r.optString("error", "加载失败");
                             Toast.makeText(getActivity(), why, Toast.LENGTH_SHORT).show();
                             return;
                         }
+                        showLoading(false);
                         JSONArray arr = r.optJSONArray("messages");
                         if (arr == null) return;
                         merge(parse(arr), true);
@@ -242,10 +275,46 @@ public class ChatFragment extends Fragment {
             added = true;
         }
         if (!added && !replace) return;
+        fillQuote(data);
         ThemeEngine.trimRainbow(60);
         ad.sort();
         ad.notifyDataSetChanged();
+        // 新消息从底部平滑上移，而不是突然出现
+        if (!replace && added && atBottom()) {
+            animateNewMessage();
+        }
         lv.setSelection(data.size() - 1);
+    }
+
+    /** 列表是否已贴近底部（贴近时才播动画，避免打断正在翻记录的用户） */
+    private boolean atBottom() {
+        if (lv == null || lv.getAdapter() == null) return false;
+        int last = lv.getAdapter().getCount() - 1;
+        return lv.getLastVisiblePosition() >= last - 1;
+    }
+
+    /** 最后一条消息从输入框下方平滑上移 */
+    private void animateNewMessage() {
+        if (lv == null) return;
+        try {
+            View child = lv.getChildAt(lv.getChildCount() - 1);
+            if (child == null) return;
+            android.view.animation.AnimationSet set =
+                    new android.view.animation.AnimationSet(true);
+            android.view.animation.TranslateAnimation ta =
+                    new android.view.animation.TranslateAnimation(
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0f,
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0f,
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0.35f,
+                            android.view.animation.Animation.RELATIVE_TO_SELF, 0f);
+            android.view.animation.AlphaAnimation aa =
+                    new android.view.animation.AlphaAnimation(0f, 1f);
+            set.addAnimation(ta);
+            set.addAnimation(aa);
+            set.setDuration(260);
+            set.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            child.startAnimation(set);
+        } catch (Throwable ignore) {}
     }
 
     // ---------- 轮询 ----------
@@ -302,12 +371,21 @@ public class ChatFragment extends Fragment {
                         if (r == null || !r.optBoolean("success", false)) return;
                         JSONArray arr = r.optJSONArray("users");
                         if (arr == null) return;
-                        StringBuilder sb = new StringBuilder("在线 " + arr.length() + "：");
+                        String prefix = "在线 " + arr.length() + "：";
+                        StringBuilder sb = new StringBuilder(prefix);
                         for (int i = 0; i < arr.length() && i < 8; i++) {
                             sb.append(arr.optString(i, ""));
                             if (i < arr.length() - 1) sb.append("、");
                         }
-                        if (tvOnline != null) tvOnline.setText(sb.toString());
+                        if (tvOnline != null) {
+                            // 「在线 N」用绿色，后面的人名保持常规色
+                            android.text.SpannableString sp =
+                                    new android.text.SpannableString(sb.toString());
+                            sp.setSpan(new android.text.style.ForegroundColorSpan(0xFF2E7D32),
+                                    0, prefix.length(),
+                                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            tvOnline.setText(sp);
+                        }
                     }
                 });
             }
@@ -347,6 +425,7 @@ public class ChatFragment extends Fragment {
                         b.put("filename", filename);
                         b.put("size", size);
                     }
+                    if (quoting != null && quoting.id > 0) b.put("reply_to", quoting.id);
                 } catch (Exception ignore) {}
                 final JSONObject r = Api.post(
                         mode.equals("channel") ? "user.php?action=ch_send" : "user.php?action=pm_send", b);
@@ -359,6 +438,7 @@ public class ChatFragment extends Fragment {
                             return;
                         }
                         if (host != null) host.refreshPoints();
+                        clearQuote();
                         // 整量重拉：只靠增量轮询可能拿不回自己刚发的消息
                         loadHistory();
                     }
@@ -479,18 +559,53 @@ public class ChatFragment extends Fragment {
                             thumb.setLayoutParams(new LinearLayout.LayoutParams(120, 120));
                             thumb.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
                             new ImgLoader(thumb).load(Api.absUrl(u), 200, 200);
+                            // 点缩略图本身 = 放大查看
+                            thumb.setOnClickListener(new View.OnClickListener() {
+                                public void onClick(View v) { openImage(u); }
+                            });
+
+                            LinearLayout info = new LinearLayout(getActivity());
+                            info.setOrientation(LinearLayout.VERTICAL);
+                            info.setLayoutParams(new LinearLayout.LayoutParams(
+                                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                            info.setPadding(12, 0, 0, 0);
 
                             TextView t = new TextView(getActivity());
                             t.setText(nm);
                             t.setTextColor(ThemeEngine.themeText());
-                            t.setPadding(12, 0, 0, 0);
                             t.setTextSize(13);
+                            t.setSingleLine(true);
 
-                            row.addView(thumb);
-                            row.addView(t);
-                            row.setOnClickListener(new View.OnClickListener() {
+                            // 发送 / 删除 两个操作按钮
+                            LinearLayout ops = new LinearLayout(getActivity());
+                            ops.setOrientation(LinearLayout.HORIZONTAL);
+                            ops.setPadding(0, 6, 0, 0);
+
+                            TextView send = new TextView(getActivity());
+                            send.setText("发送");
+                            send.setTextColor(0xFF4A90D9);
+                            send.setTextSize(12);
+                            send.setPadding(0, 4, 20, 4);
+                            send.setOnClickListener(new View.OnClickListener() {
                                 public void onClick(View v) { doSend(u, "image", nm, 0); }
                             });
+
+                            TextView del = new TextView(getActivity());
+                            del.setText("删除（返还 50% 积分）");
+                            del.setTextColor(0xFFE74C3C);
+                            del.setTextSize(12);
+                            del.setPadding(0, 4, 0, 4);
+                            del.setOnClickListener(new View.OnClickListener() {
+                                public void onClick(View v) { confirmDeleteUpload(nm); }
+                            });
+
+                            ops.addView(send);
+                            ops.addView(del);
+                            info.addView(t);
+                            info.addView(ops);
+
+                            row.addView(thumb);
+                            row.addView(info);
                             box.addView(row);
                         }
                         sv.addView(box);
@@ -519,6 +634,41 @@ public class ChatFragment extends Fragment {
         }
     }
 
+    /** 删除上传：返还该图片 50% 积分 */
+    private void confirmDeleteUpload(final String name) {
+        if (getActivity() == null) return;
+        new AlertDialog.Builder(getActivity())
+                .setTitle("删除这张图片？")
+                .setMessage("删除后将返还该图片消耗的 50% 积分，且无法恢复。")
+                .setNegativeButton("我再想想", null)
+                .setPositiveButton("确认删除", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { doDeleteUpload(name); }
+                })
+                .show();
+    }
+
+    private void doDeleteUpload(final String name) {
+        toast("删除中…");
+        new Thread(new Runnable() {
+            public void run() {
+                JSONObject b = new JSONObject();
+                try { b.put("name", name); } catch (Exception ignore) {}
+                final JSONObject r = Api.post("user.php?action=delete_upload", b);
+                ui(new Runnable() {
+                    public void run() {
+                        if (r == null) { toast("删除失败"); return; }
+                        if (!r.optBoolean("success", false)) {
+                            toast(r.optString("error", "删除失败"));
+                            return;
+                        }
+                        toast("已删除，返还 " + r.optInt("refund", 0) + " 积分");
+                        if (host != null) host.refreshPoints();
+                    }
+                });
+            }
+        }).start();
+    }
+
     private void openImage(String content) {
         if (getActivity() == null || content == null || content.isEmpty()) return;
         startActivity(new Intent(getActivity(), ImageViewActivity.class)
@@ -528,24 +678,50 @@ public class ChatFragment extends Fragment {
     // ---------- 消息菜单（撤回 / 复制）----------
     private void showMsgMenu(final Models.Msg m) {
         if (getActivity() == null) return;
-        List<String> acts = new ArrayList<String>();
+        final boolean mine = m.username.equals(Prefs.user());
+        final boolean canRecall = mine
+                && (System.currentTimeMillis() / 1000 - m.timestamp) < 120;
+
+        final List<String> acts = new ArrayList<String>();
+        if (canRecall) acts.add("撤回");
+        acts.add("引用");
         acts.add("复制");
-        boolean mine = m.username.equals(Prefs.user());
-        if (mine && (System.currentTimeMillis() / 1000 - m.timestamp) < 120) acts.add("撤回");
+
         new AlertDialog.Builder(getActivity())
+                .setTitle(mine ? "我的消息" : m.username)
                 .setItems(acts.toArray(new String[0]), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
-                        if (w == 0) {
+                        String a = acts.get(w);
+                        if ("复制".equals(a)) {
                             android.content.ClipboardManager cm =
                                     (android.content.ClipboardManager) getActivity()
                                             .getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                             cm.setText(m.content);
                             toast("已复制");
+                        } else if ("引用".equals(a)) {
+                            setQuote(m);
                         } else {
                             doRecall(m);
                         }
                     }
                 }).show();
+    }
+
+    /** 设置引用目标，并在输入框上方显示可取消的引用条 */
+    private void setQuote(Models.Msg m) {
+        quoting = m;
+        if (quoteBar == null) return;
+        quoteBar.setVisibility(View.VISIBLE);
+        if (quoteText != null) {
+            String t = "image".equals(m.type) ? "[图片]" : m.content;
+            if (t.length() > 30) t = t.substring(0, 30) + "…";
+            quoteText.setText("引用 " + m.username + "：" + t);
+        }
+    }
+
+    private void clearQuote() {
+        quoting = null;
+        if (quoteBar != null) quoteBar.setVisibility(View.GONE);
     }
 
     private void doRecall(final Models.Msg m) {
@@ -590,9 +766,30 @@ public class ChatFragment extends Fragment {
             m.dup = o.optInt("dup", 0);
             m.id = o.optInt("id", 0);
             m.badge = o.optString("badge", "");
+            // 服务端按发送者回填的个性化样式与身份
+            m.uid = o.optString("uid", "");
+            m.bubble = o.optString("bubble", "");
+            m.namecolor = o.optString("namecolor", "");
+            m.replyTo = o.optLong("reply_to", 0);
             out.add(m);
         }
         return out;
+    }
+
+    /** 引用后，回填被引用者的昵称与摘要，供气泡上方展示 */
+    private void fillQuote(List<Models.Msg> got) {
+        if (got == null || got.isEmpty()) return;
+        for (Models.Msg m : got) {
+            if (m.replyTo <= 0) continue;
+            for (Models.Msg src : data) {
+                if (src.id > 0 && src.id == m.replyTo) {
+                    m.replyName = src.username;
+                    m.replyText = "image".equals(src.type) ? "[图片]" : src.content;
+                    break;
+                }
+            }
+            if (m.replyName.isEmpty()) m.replyName = "引用消息";
+        }
     }
 
     private void toast(String s) {

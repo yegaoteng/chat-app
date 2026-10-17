@@ -54,8 +54,8 @@ public class FriendsFragment extends Fragment {
                 TextView icon = cv.findViewById(R.id.tvIcon);
                 TextView name = cv.findViewById(R.id.tvName);
                 TextView unread = cv.findViewById(R.id.tvUnread);
-                icon.setText("#");
-                name.setText(ch.name);
+                icon.setText(ch.pinned ? "★" : "#");
+                name.setText((ch.pinned ? "「置顶」" : "") + ch.name);
                 name.setTextColor(ThemeEngine.themeText());
                 if (ch.unread > 0) {
                     unread.setVisibility(View.VISIBLE);
@@ -74,6 +74,14 @@ public class FriendsFragment extends Fragment {
             }
         });
 
+        // 长按频道：置顶 / 退出频道
+        lvChannel.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            public boolean onItemLongClick(AdapterView<?> p, View v2, int pos, long id) {
+                showChannelMenu(chans.get(pos));
+                return true;
+            }
+        });
+
         frAd = new BaseAdapter() {
             public int getCount() { return friends.size(); }
             public Object getItem(int p) { return friends.get(p); }
@@ -88,8 +96,16 @@ public class FriendsFragment extends Fragment {
                 TextView pin = cv.findViewById(R.id.tvPin);
                 View dot = cv.findViewById(R.id.vUnread);
 
-                String base = f.username + (f.online ? "  ●在线" : "");
-                name.setText(base);
+                name.setText(f.username);
+                if (f.online) {
+                    // 「在线」用绿色跟在昵称后面
+                    android.text.SpannableString sp =
+                            new android.text.SpannableString(f.username + "  在线");
+                    sp.setSpan(new android.text.style.ForegroundColorSpan(0xFF2E7D32),
+                            f.username.length(), sp.length(),
+                            android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    name.setText(sp);
+                }
                 last.setText(f.last.isEmpty() ? "还没有聊天" : f.last);
                 pin.setVisibility(f.pinned ? View.VISIBLE : View.GONE);
                 dot.setVisibility(f.unread > 0 ? View.VISIBLE : View.GONE);
@@ -131,6 +147,79 @@ public class FriendsFragment extends Fragment {
             public void onClick(View v2) { showRequests(); }
         });
         return v;
+    }
+
+    /** 频道长按菜单：置顶频道 / 退出频道 */
+    private void showChannelMenu(final Models.Channel ch) {
+        if (getActivity() == null) return;
+        final List<String> acts = new ArrayList<String>();
+        acts.add(ch.pinned ? "取消置顶" : "置顶频道");
+        acts.add("退出频道");
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(ch.name)
+                .setItems(acts.toArray(new String[0]), new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        if (w == 0) doPinChannel(ch);
+                        else confirmQuitChannel(ch);
+                    }
+                }).show();
+    }
+
+    private void doPinChannel(final Models.Channel ch) {
+        new Thread(new Runnable() {
+            public void run() {
+                JSONObject b = new JSONObject();
+                try { b.put("code", ch.code); } catch (Exception ignore) {}
+                final JSONObject r = Api.post("user.php?action=pin_channel", b);
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (r == null) { toast("网络错误"); return; }
+                        if (!r.optBoolean("success", false)) {
+                            toast(r.optString("error", "操作失败"));
+                            return;
+                        }
+                        toast(r.optBoolean("pinned", false) ? "已置顶" : "已取消置顶");
+                        loadChannels();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void confirmQuitChannel(final Models.Channel ch) {
+        if (getActivity() == null) return;
+        new AlertDialog.Builder(getActivity())
+                .setTitle("退出频道")
+                .setMessage("确定退出「" + ch.name + "」吗？退出后需要重新输入频道码才能加入。")
+                .setNegativeButton("我再想想", null)
+                .setPositiveButton("退出", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { doQuitChannel(ch); }
+                })
+                .show();
+    }
+
+    private void doQuitChannel(final Models.Channel ch) {
+        new Thread(new Runnable() {
+            public void run() {
+                JSONObject b = new JSONObject();
+                try { b.put("code", ch.code); } catch (Exception ignore) {}
+                final JSONObject r = Api.post("user.php?action=quit_channel", b);
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (r == null) { toast("网络错误"); return; }
+                        if (!r.optBoolean("success", false)) {
+                            toast(r.optString("error", "退出失败"));
+                            return;
+                        }
+                        toast("已退出频道");
+                        loadChannels();
+                    }
+                });
+            }
+        }).start();
     }
 
     /** 应用个性化主题 */
@@ -196,6 +285,7 @@ public class FriendsFragment extends Fragment {
                             c.code = o.optString("code", "");
                             c.name = o.optString("name", c.code);
                             c.lastTs = o.optLong("last_ts", 0);
+                            c.pinned = o.optBoolean("pinned", false);
                             chans.add(c);
                         }
                         chAd.notifyDataSetChanged();

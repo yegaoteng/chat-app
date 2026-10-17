@@ -22,6 +22,15 @@ public class MsgAdapter extends BaseAdapter {
     private final List<Models.Msg> data;
     private final LayoutInflater inf;
 
+    /** 点击图片的回调（由 ChatFragment 提供，用于全屏查看） */
+    public interface OnImageClick {
+        void onImage(String content);
+    }
+
+    private OnImageClick imageClick;
+
+    public void setOnImageClick(OnImageClick l) { imageClick = l; }
+
     public MsgAdapter(Context c, List<Models.Msg> d) {
         ctx = c;
         data = d;
@@ -45,14 +54,18 @@ public class MsgAdapter extends BaseAdapter {
         if (cv == null) {
             cv = inf.inflate(R.layout.item_msg, parent, false);
             vh = new ViewHolder();
-            vh.root     = cv.findViewById(R.id.rowRoot);
-            vh.inner    = cv.findViewById(R.id.rowInner);
-            vh.avLeft   = cv.findViewById(R.id.ivAvLeft);
-            vh.avRight  = cv.findViewById(R.id.ivAvRight);
-            vh.name     = cv.findViewById(R.id.tvName);
-            vh.body     = cv.findViewById(R.id.tvBody);
-            vh.img      = cv.findViewById(R.id.ivImg);
-            vh.time     = cv.findViewById(R.id.tvTime);
+            vh.root       = cv.findViewById(R.id.rowRoot);
+            vh.inner      = cv.findViewById(R.id.rowInner);
+            vh.avLeft     = cv.findViewById(R.id.ivAvLeft);
+            vh.avRight    = cv.findViewById(R.id.ivAvRight);
+            vh.name       = cv.findViewById(R.id.tvName);
+            vh.body       = cv.findViewById(R.id.tvBody);
+            vh.img        = cv.findViewById(R.id.ivImg);
+            vh.imgLoading = cv.findViewById(R.id.tvImgLoading);
+            vh.time       = cv.findViewById(R.id.tvTime);
+            vh.quoteBox   = cv.findViewById(R.id.quoteBox);
+            vh.quoteName  = cv.findViewById(R.id.tvQuoteName);
+            vh.quoteText  = cv.findViewById(R.id.tvQuoteText);
             cv.setTag(vh);
         } else {
             vh = (ViewHolder) cv.getTag();
@@ -67,34 +80,44 @@ public class MsgAdapter extends BaseAdapter {
         vh.avLeft.setVisibility(self ? View.GONE : View.VISIBLE);
         vh.avRight.setVisibility(self ? View.VISIBLE : View.GONE);
 
-        // ---- 气泡（应用个性化）----
-        vh.body.setBackgroundDrawable(ThemeEngine.bubble(self));
-        vh.body.setTextColor(ThemeEngine.bubbleText(self));
+        // ---- 气泡：用服务端回填的发送者样式，别人也能看到个性化 ----
+        String bKey = (m.bubble == null || m.bubble.isEmpty()) ? "default" : m.bubble;
+        vh.body.setBackgroundDrawable(ThemeEngine.bubbleFor(bKey, self));
+        vh.body.setTextColor(ThemeEngine.bubbleTextFor(bKey, self));
+
+        // ---- 引用块 ----
+        if (m.replyTo > 0) {
+            vh.quoteBox.setVisibility(View.VISIBLE);
+            vh.quoteName.setText(m.replyName == null || m.replyName.isEmpty()
+                    ? "引用消息" : m.replyName);
+            String t = m.replyText == null ? "" : m.replyText;
+            if (t.isEmpty()) t = "[图片]";
+            vh.quoteText.setText(t);
+        } else {
+            vh.quoteBox.setVisibility(View.GONE);
+        }
 
         // ---- 内容：文本 / 图片 ----
         if ("image".equals(m.type)) {
             vh.body.setVisibility(View.GONE);
-            vh.img.setVisibility(View.VISIBLE);
+            vh.img.setVisibility(View.GONE);
+            vh.imgLoading.setVisibility(View.VISIBLE);
             vh.img.setImageDrawable(null);
-            loadImg(vh.img, Api.absUrl(m.content), 640, 640);
-            vh.img.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) { openImage(m.content); }
-            });
+            loadImg(vh, m.content);
         } else {
             vh.img.setVisibility(View.GONE);
-            vh.img.setOnClickListener(null);
+            vh.imgLoading.setVisibility(View.GONE);
             vh.body.setVisibility(View.VISIBLE);
             vh.body.setText(m.content);
-            vh.body.setOnClickListener(null);
         }
 
         // ---- 头像：自己也显示（放右侧）----
         ImageView av = self ? vh.avRight : vh.avLeft;
         loadAvatar(av, m.username, m.avatar);
 
-        // ---- 名称 ----
+        // ---- 名称：用发送者的个性化颜色 ----
         vh.name.setText(m.username);
-        ThemeEngine.applyNameColor(vh.name, null);
+        ThemeEngine.applyNameColorFor(vh.name, m.namecolor);
 
         // ---- 时间：与上一条间隔超过 5 分钟才显示 ----
         if (pos > 0 && (m.timestamp - data.get(pos - 1).timestamp) < 300) {
@@ -113,28 +136,61 @@ public class MsgAdapter extends BaseAdapter {
         return f.format(new java.util.Date(ts * 1000));
     }
 
-    private void openImage(String content) {
-        if (ctx == null || content == null || content.isEmpty()) return;
-        try {
-            android.content.Intent i = new android.content.Intent(ctx, ImageViewActivity.class);
-            i.putExtra("url", Api.absUrl(content));
-            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            ctx.startActivity(i);
-        } catch (Exception ignore) {}
+    /** 加载消息图片：命中缓存直接显示，否则先显示「图片加载中…」 */
+    private void loadImg(final ViewHolder vh, final String content) {
+        final String url = Api.absUrl(content);
+        if (url.isEmpty()) { vh.imgLoading.setVisibility(View.GONE); return; }
+
+        Bitmap cached = ImgLoader.cached(url);
+        if (cached != null) {
+            vh.imgLoading.setVisibility(View.GONE);
+            vh.img.setVisibility(View.VISIBLE);
+            vh.img.setImageBitmap(cached);
+            bindImageClick(vh, content);
+            return;
+        }
+
+        vh.imgLoading.setVisibility(View.VISIBLE);
+        vh.img.setVisibility(View.GONE);
+        vh.img.setTag(url);
+
+        new Thread(new Runnable() {
+            public void run() {
+                final Bitmap bm = ImgLoader.fetch(url, 640, 640);
+                if (bm == null) return;
+                ImgLoader.put(url, bm);
+                vh.img.post(new Runnable() {
+                    public void run() {
+                        if (!url.equals(vh.img.getTag())) return;
+                        vh.img.setImageBitmap(bm);
+                        vh.imgLoading.setVisibility(View.GONE);
+                        vh.img.setVisibility(View.VISIBLE);
+                        bindImageClick(vh, content);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void bindImageClick(final ViewHolder vh, final String content) {
+        vh.img.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (imageClick != null) imageClick.onImage(content);
+            }
+        });
     }
 
     private void loadAvatar(final ImageView iv, final String name, final String url) {
         if (iv == null) return;
         if (url != null && !url.isEmpty()) {
-            loadImg(iv, Api.absUrl(url), new Avatars(name), 96, 96);
+            loadImgSimple(iv, Api.absUrl(url), new Avatars(name), 96, 96);
         } else {
             iv.setImageDrawable(new Avatars(name));
         }
     }
 
-    /** 带占位图的加载，失败时保留占位（头像不至于空白） */
-    private void loadImg(final ImageView iv, final String url,
-                         final Drawable placeholder, final int w, final int h) {
+    private void loadImgSimple(final ImageView iv, final String url,
+                               final Drawable placeholder, final int w, final int h) {
         if (iv == null) return;
         if (url == null || url.isEmpty()) { iv.setImageDrawable(placeholder); return; }
         Bitmap cached = ImgLoader.cached(url);
@@ -153,25 +209,16 @@ public class MsgAdapter extends BaseAdapter {
                         }
                     });
                 } catch (Throwable ignore) {
-                    // 图片解码失败（含 OOM）绝不能影响消息列表
+                    // 单张图失败不影响列表
                 }
             }
         }).start();
     }
 
-    private void loadImg(final ImageView iv, final String url,
-                         final Drawable placeholder) {
-        loadImg(iv, url, placeholder, 640, 640);
-    }
-
-    private void loadImg(final ImageView iv, final String url, int w, int h) {
-        loadImg(iv, url, null, w, h);
-    }
-
     static class ViewHolder {
         View root;
-        LinearLayout inner;
+        LinearLayout inner, quoteBox;
         ImageView avLeft, avRight, img;
-        TextView name, body, time;
+        TextView name, body, time, imgLoading, quoteName, quoteText;
     }
 }

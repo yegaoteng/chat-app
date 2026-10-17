@@ -106,8 +106,17 @@ public class ThemeEngine {
      * 生成气泡背景。
      * @param self 是否为自己发送的消息
      */
+    /** 默认气泡（用自己的偏好） */
     public static GradientDrawable bubble(boolean self) {
-        String k = bubbleKey();
+        return bubbleFor(bubbleKey(), self);
+    }
+
+    /**
+     * 按指定气泡 key 生成背景。
+     * 服务端会在每条消息里回填发送者的 bubble，所以别人看到的也是对方的个性化气泡。
+     */
+    public static GradientDrawable bubbleFor(String bubbleKey, boolean self) {
+        String k = (bubbleKey == null || bubbleKey.isEmpty()) ? "default" : bubbleKey;
         GradientDrawable gd = new GradientDrawable();
 
         if ("golden".equals(k)) {
@@ -131,17 +140,22 @@ public class ThemeEngine {
             gd.setStroke(3, rainbowColor(0));
             return gd;
         }
-        // default：跟随主题
+        // default：跟随主题。加一圈描边，保证在主题背景上依然「浮」出来
         int fill = self ? (isGold() ? 0xFFC8901E : 0xFF667EEA)
                         : (isGold() ? 0xFFFFF0C0 : 0xFFECECEF);
         gd.setColor(fill);
         gd.setCornerRadius(14);
+        gd.setStroke(1, isGold() ? 0x66FFFFFF : 0x14000000);
         return gd;
     }
 
     /** 气泡内文字颜色：与底色自动取对比度更高的一方 */
     public static int bubbleText(boolean self) {
-        String k = bubbleKey();
+        return bubbleTextFor(bubbleKey(), self);
+    }
+
+    public static int bubbleTextFor(String bubbleKey, boolean self) {
+        String k = (bubbleKey == null || bubbleKey.isEmpty()) ? "default" : bubbleKey;
         if ("golden".equals(k)) return self ? 0xFF3A2A00 : 0xFF4A3A00;
         if ("rainbow".equals(k)) return isGold() ? 0xFF4A2C00 : 0xFF222222;
         return self ? 0xFFFFFFFF : (isGold() ? 0xFF4A2C00 : 0xFF222222);
@@ -167,18 +181,32 @@ public class ThemeEngine {
 
     /** 普通名称颜色（非彩虹时） */
     public static int namePlainColor() {
-        if ("gold".equals(nameKey())) return 0xFFD4A017;
+        return namePlainColorFor(nameKey());
+    }
+
+    /** 按指定名称颜色 key 取普通色 */
+    public static int namePlainColorFor(String key) {
+        if ("gold".equals(key)) return 0xFFD4A017;
         return isGold() ? 0xFF8A5A00 : 0xFF222222;
     }
 
     /** 给 TextView 应用名称颜色（彩虹用渐变 shader，动态带流动） */
     public static void applyNameColor(TextView tv, String fallbackPlain) {
+        applyNameColorFor(tv, nameKey());
+    }
+
+    /**
+     * 给 TextView 应用指定名称颜色。
+     * 传 null/空表示用默认色（对方没设置个性化时）。
+     */
+    public static void applyNameColorFor(TextView tv, String key) {
         if (tv == null) return;
-        if (isRainbow()) {
+        String k = (key == null || key.isEmpty()) ? "default" : key;
+        if ("rainbow_static".equals(k) || "rainbow_dynamic".equals(k)) {
             applyRainbow(tv);
         } else {
             tv.getPaint().setShader(null);
-            tv.setTextColor(namePlainColor());
+            tv.setTextColor(namePlainColorFor(k));
             RainbowAnimator.unregister(tv);
         }
     }

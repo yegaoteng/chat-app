@@ -53,6 +53,30 @@
             android:textColorHint="@color/text_sub"
             android:textSize="14sp" />
 
+        <!-- UID：注册时填写，注册后不可自行更改 -->
+        <EditText
+            android:id="@+id/edUid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="@string/hint_uid"
+            android:background="@drawable/bg_input"
+            android:padding="12dp"
+            android:textColor="@color/text"
+            android:textColorHint="@color/text_sub"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvUidTip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/uid_warn"
+            android:textColor="#FFB74D"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <EditText
             android:id="@+id/edInvite"
             android:layout_width="match_parent"

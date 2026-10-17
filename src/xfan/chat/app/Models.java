@@ -14,6 +14,12 @@ public class Models {
         public int id = 0;          // 私聊消息 id
         public String badge = "";
         public boolean recalled;
+        public String uid = "";       // 发送者 UID（稳定身份）
+        public String bubble = "";    // 发送者个性化气泡（服务端按发送者回填）
+        public String namecolor = ""; // 发送者个性化名称颜色
+        public long replyTo = 0;      // 引用的消息 id
+        public String replyName = ""; // 被引用者昵称（本地展示用）
+        public String replyText = ""; // 被引用内容摘要
 
         public String key() {
             if (id > 0) return "p_" + id;
@@ -38,6 +44,7 @@ public class Models {
         public String desc = "";
         public long lastTs;
         public int unread;
+        public boolean pinned;
     }
 
     public static class Req {

@@ -13,7 +13,8 @@ import org.json.JSONObject;
 
 public class LoginActivity extends Activity {
 
-    private EditText edUser, edPass, edInvite;
+    private EditText edUser, edPass, edInvite, edUid;
+    private TextView tvUidTip;
     private Button btnLogin, btnRegister, btnWeb;
     private TextView tvTip;
     private boolean regMode = false;
@@ -24,6 +25,7 @@ public class LoginActivity extends Activity {
         // 必须在最前面：后面任何一处抛异常都能被记录
         CrashGuard.install(this);
         Prefs.init(this);
+        ImgLoader.init(this);
         // WebView 通道要在任何请求之前初始化
         Api.applyHttpSwitch();
         Api.bindContext(this);
@@ -36,6 +38,8 @@ public class LoginActivity extends Activity {
         edUser   = findViewById(R.id.edUser);
         edPass   = findViewById(R.id.edPass);
         edInvite = findViewById(R.id.edInvite);
+        edUid    = findViewById(R.id.edUid);
+        tvUidTip = findViewById(R.id.tvUidTip);
         btnLogin = findViewById(R.id.btnLogin);
         btnRegister = findViewById(R.id.btnRegister);
         tvTip    = findViewById(R.id.tvTip);
@@ -75,9 +79,11 @@ public class LoginActivity extends Activity {
                 if (!regMode) {
                     regMode = true;
                     edInvite.setVisibility(View.VISIBLE);
+                    edUid.setVisibility(View.VISIBLE);
+                    tvUidTip.setVisibility(View.VISIBLE);
                     btnLogin.setText("已有账号？点此登录");
                     btnRegister.setText("确认注册");
-                    tvTip.setText("注册需要邀请码");
+                    tvTip.setText("注册需要邀请码，UID 一经注册不可更改");
                 } else {
                     doRegister();
                 }
@@ -89,6 +95,8 @@ public class LoginActivity extends Activity {
                 if (regMode) {
                     regMode = false;
                     edInvite.setVisibility(View.GONE);
+                    edUid.setVisibility(View.GONE);
+                    tvUidTip.setVisibility(View.GONE);
                     btnLogin.setText(R.string.btn_login);
                     btnRegister.setText(R.string.btn_register);
                     tvTip.setText("");
@@ -151,7 +159,7 @@ public class LoginActivity extends Activity {
     private boolean checkInput() {
         String u = edUser.getText().toString().trim();
         String p = edPass.getText().toString().trim();
-        if (u.isEmpty()) { toast("请填写用户名"); return false; }
+        if (u.isEmpty()) { toast("请填写用户名或 UID"); return false; }
         if (p.isEmpty()) { toast("请填写密码"); return false; }
         return true;
     }
@@ -179,9 +187,15 @@ public class LoginActivity extends Activity {
                         }
                         String token = r.optString("token", "");
                         if (token.isEmpty()) { toast("服务器未返回 token"); return; }
+                        // 必须存服务器返回的真实用户名：用 UID 登录时
+                        // 存 UID 会让自己的消息被判成别人发的（显示在左边）
+                        String real = r.optString("username", "");
+                        if (real.isEmpty()) real = u;
                         Prefs.token(token);
-                        Prefs.user(u);
+                        Prefs.user(real);
                         Prefs.pass(p);
+                        String gotUid = r.optString("uid", "");
+                        if (!gotUid.isEmpty()) Prefs.uid(gotUid);
                         enterMain();
                     }
                 });
@@ -194,7 +208,34 @@ public class LoginActivity extends Activity {
         final String u = edUser.getText().toString().trim();
         final String p = edPass.getText().toString().trim();
         final String inv = edInvite.getText().toString().trim();
+        final String uid = edUid == null ? "" : edUid.getText().toString().trim();
         if (p.length() < 4) { toast("密码至少 4 位"); return; }
+
+        // UID 只能英文和数字
+        if (!uid.matches("[A-Za-z0-9]{3,20}")) { toast(getString(R.string.uid_invalid)); return; }
+
+        // UID 不可更改：点「确认注册」后再弹一次警告
+        confirmUid(u, uid, p, inv);
+    }
+
+    /** 二次确认：UID 一经注册不可更改 */
+    private void confirmUid(final String u, final String uid,
+                            final String p, final String inv) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.uid_confirm_title)
+                .setMessage("你的 UID 将是「" + uid + "」，注册后不可更改（仅管理员可在后台修改）。\n\n确定使用这个 UID 吗？")
+                .setNegativeButton(R.string.uid_think_again, null)
+                .setPositiveButton(R.string.uid_confirm_use,
+                        new android.content.DialogInterface.OnClickListener() {
+                            public void onClick(android.content.DialogInterface d, int w) {
+                                doRegisterFinal(u, uid, p, inv);
+                            }
+                        })
+                .show();
+    }
+
+    private void doRegisterFinal(final String u, final String uid,
+                                 final String p, final String inv) {
         setBusy(true, "注册中…");
         new Thread(new Runnable() {
             public void run() {
@@ -203,6 +244,7 @@ public class LoginActivity extends Activity {
                     body.put("username", u);
                     body.put("password", p);
                     body.put("invite", inv);
+                    body.put("uid", uid);
                 } catch (Exception ignore) {}
                 final JSONObject r = Api.post("appapi.php?action=app_register", body);
                 runOnUiThread(new Runnable() {
@@ -223,6 +265,8 @@ public class LoginActivity extends Activity {
                             toast("注册成功，请登录");
                             regMode = false;
                             edInvite.setVisibility(View.GONE);
+                            edUid.setVisibility(View.GONE);
+                            tvUidTip.setVisibility(View.GONE);
                             btnLogin.setText(R.string.btn_login);
                             btnRegister.setText(R.string.btn_register);
                         }

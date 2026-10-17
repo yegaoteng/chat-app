@@ -59,6 +59,7 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         CrashGuard.install(this);
         Prefs.init(this);
+        ImgLoader.init(this);
         Api.applyHttpSwitch();
         Api.bindContext(this);
         new Thread(new Runnable() {
@@ -258,21 +259,43 @@ public class MainActivity extends Activity {
                 TranslateAnimation.RELATIVE_TO_SELF, 0f,
                 TranslateAnimation.RELATIVE_TO_SELF, 0f);
         an.setDuration(260);
+        an.setInterpolator(new android.view.animation.DecelerateInterpolator());
         drawerPanel.startAnimation(an);
+        android.view.animation.AlphaAnimation fa =
+                new android.view.animation.AlphaAnimation(0f, 1f);
+        fa.setDuration(260);
+        View mask = findViewById(R.id.drawerMask);
+        if (mask != null) mask.startAnimation(fa);
         drawerOpen = true;
         loadDrawer();
     }
 
     private void closeDrawer() {
+        if (!drawerOpen) { drawerRoot.setVisibility(View.GONE); return; }
+        drawerOpen = false;
         TranslateAnimation an = new TranslateAnimation(
                 TranslateAnimation.RELATIVE_TO_SELF, 0f,
                 TranslateAnimation.RELATIVE_TO_SELF, -1f,
                 TranslateAnimation.RELATIVE_TO_SELF, 0f,
                 TranslateAnimation.RELATIVE_TO_SELF, 0f);
-        an.setDuration(220);
+        an.setDuration(240);
+        an.setInterpolator(new android.view.animation.AccelerateInterpolator());
+        // 关键：动画播完再隐藏容器，否则面板会瞬间消失、看不到收回过程
+        an.setAnimationListener(new android.view.animation.Animation.AnimationListener() {
+            public void onAnimationStart(android.view.animation.Animation a) {}
+            public void onAnimationEnd(android.view.animation.Animation a) {
+                if (!drawerOpen) drawerRoot.setVisibility(View.GONE);
+            }
+            public void onAnimationRepeat(android.view.animation.Animation a) {}
+        });
         drawerPanel.startAnimation(an);
-        drawerRoot.setVisibility(View.GONE);
-        drawerOpen = false;
+
+        // 遮罩同步淡出
+        android.view.animation.AlphaAnimation fa =
+                new android.view.animation.AlphaAnimation(1f, 0f);
+        fa.setDuration(240);
+        View mask = findViewById(R.id.drawerMask);
+        if (mask != null) mask.startAnimation(fa);
     }
 
     // ---------- 积分 / 资料 ----------
@@ -331,6 +354,23 @@ public class MainActivity extends Activity {
         }).start();
     }
 
+    /**
+     * 抽屉里的可点击项统一套「圆角矩形按钮」边框，
+     * 让用户一眼看出这里能点（之前是纯文字，看不出可交互）。
+     */
+    private void asButton(View v) {
+        if (v == null) return;
+        v.setBackgroundResource(R.drawable.bg_sidebar_btn);
+        v.setClickable(true);
+    }
+
+    /** 当前选中项：边框加粗、底色更亮 */
+    private void asButtonOn(View v) {
+        if (v == null) return;
+        v.setBackgroundResource(R.drawable.bg_sidebar_btn_on);
+        v.setClickable(true);
+    }
+
     private TextView sectionTitle(String s) {
         TextView t = new TextView(this);
         t.setText(s);
@@ -376,6 +416,7 @@ public class MainActivity extends Activity {
         btn.setPadding(10, 12, 10, 12);
         btn.setLayoutParams(new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        asButton(btn);
 
         final ProgressBar pb = new ProgressBar(this);
         pb.setVisibility(View.GONE);
@@ -429,6 +470,7 @@ public class MainActivity extends Activity {
         btn.setTextColor(getResources().getColor(R.color.text_drawer));
         btn.setTextSize(14);
         btn.setPadding(10, 12, 10, 12);
+        asButton(btn);
         btn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 final String code = ed.getText().toString().trim();
@@ -518,7 +560,7 @@ public class MainActivity extends Activity {
             row.setTextColor(getResources().getColor(R.color.text_drawer));
             row.setTextSize(13);
             row.setPadding(12, 10, 12, 10);
-            if (key.equals(cur)) row.setBackgroundColor(0x225FE3F0);
+            if (key.equals(cur)) asButtonOn(row); else asButton(row);
             markStyle(row, kind);
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { setStyle(kind, key, has, price); }

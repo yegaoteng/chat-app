@@ -51,6 +51,40 @@
                 android:textColor="@color/text_sub"
                 android:textSize="11sp" />
 
+            <!-- 引用块：仅在该条消息引用了别人时显示 -->
+            <LinearLayout
+                android:id="@+id/quoteBox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:background="@drawable/bg_quote"
+                android:orientation="vertical"
+                android:paddingBottom="5dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:paddingTop="5dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvQuoteName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textColor="@color/accent"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tvQuoteText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/text_sub"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/tvBody"
                 android:layout_width="wrap_content"
@@ -74,6 +108,21 @@
                 android:adjustViewBounds="true"
                 android:maxHeight="260dp"
                 android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <!-- 图片加载中提示 -->
+            <TextView
+                android:id="@+id/tvImgLoading"
+                android:layout_width="180dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:background="@drawable/bg_card"
+                android:gravity="center"
+                android:paddingBottom="26dp"
+                android:paddingTop="26dp"
+                android:text="图片加载中…"
+                android:textColor="@color/text_sub"
+                android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>
 

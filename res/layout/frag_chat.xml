@@ -36,6 +36,29 @@
             android:layout_height="34dp"
             android:layout_gravity="center"
             android:visibility="gone" />
+
+        <!-- 切换频道/私聊时的加载提示 -->
+        <LinearLayout
+            android:id="@+id/loadingBar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#CCFFFFFF"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:layout_width="40dp"
+                android:layout_height="40dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="聊天数据加载中…"
+                android:textColor="@color/text_sub"
+                android:textSize="13sp" />
+        </LinearLayout>
     </FrameLayout>
 
     <!-- 输入区：功能按钮在上，输入框在下且占满宽度 -->
@@ -93,6 +116,42 @@
                 android:textColor="@color/text_sub"
                 android:textSize="11sp"
                 android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- 引用条：长按消息选「引用」后显示 -->
+        <LinearLayout
+            android:id="@+id/quoteBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_quote"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="8dp"
+            android:paddingTop="5dp"
+            android:paddingRight="6dp"
+            android:paddingBottom="5dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvQuote"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/text_sub"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/btnQuoteCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingLeft="10dp"
+                android:paddingRight="4dp"
+                android:text="✕"
+                android:textColor="@color/text_sub"
+                android:textSize="15sp" />
         </LinearLayout>
 
         <LinearLayout

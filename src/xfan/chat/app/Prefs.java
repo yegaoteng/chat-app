@@ -36,6 +36,10 @@ public class Prefs {
     public static String pass() { return get("pass", ""); }
     public static void pass(String v) { put("pass", v); }
 
+    /** 自己的 UID（登录时服务器下发，我的页等处展示） */
+    public static String uid() { return get("uid", ""); }
+    public static void uid(String v) { put("uid", v); }
+
     public static String theme() { return get("theme", "default"); }
     public static void theme(String v) { put("theme", v); }
 
