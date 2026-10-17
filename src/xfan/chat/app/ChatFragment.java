@@ -48,7 +48,7 @@ public class ChatFragment extends Fragment {
     private String peer = "";
     private long lastTs = 0;
 
-    private Handler h = new Handler();
+    private Handler h = new Handler(android.os.Looper.getMainLooper());
     private Runnable pollTask;
     private boolean visible = false;
     private volatile boolean polling = false;

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.LruCache;
 import android.widget.ImageView;
 
@@ -21,7 +22,13 @@ import java.net.URL;
  * 3. 有界缓存：用 LruCache 限制总内存，避免图片越攒越多。
  */
 public class ImgLoader {
-    private static final Handler h = new Handler();
+    /**
+     * 必须绑定主线程 Looper。
+     * 之前是裸 new Handler()，一旦 ImgLoader 在子线程被首次加载（类加载触发），
+     * 就会抛 "Can't create handler inside thread that has not called Looper.prepare()"
+     * —— 这是开屏页一启动就闪退的根因。
+     */
+    private static final Handler h = new Handler(android.os.Looper.getMainLooper());
 
     /** 磁盘缓存目录 + 24 小时有效期（切频道/私聊后已加载过的图直接本地取） */
     private static java.io.File diskDir = null;

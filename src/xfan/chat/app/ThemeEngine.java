@@ -231,7 +231,9 @@ public class ThemeEngine {
      * 只维护少量已注册的 TextView，避免列表滚动时堆积。
      */
     private static class RainbowAnimator {
-        private static final Handler h = new Handler();
+        // 同样必须绑主线程 Looper：RainbowAnimator 是内部类，
+        // 若在子线程被首次加载，裸 new Handler() 会直接抛异常导致闪退。
+        private static final Handler h = new Handler(android.os.Looper.getMainLooper());
         private static final List<TextView> views = new ArrayList<TextView>();
         private static boolean running = false;
         private static float off = 0f;
