@@ -13,17 +13,7 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 个性化引擎：主题 / 气泡 / 名称颜色。
- *
- * 服务端目录（lock.php styleCatalog）：
- *   theme     : default（深色随系统） / gold（金辉红框）
- *   bubble    : default / golden（金箔） / rainbow（七色流彩）
- *   namecolor : default / gold / rainbow_static / rainbow_dynamic
- *
- * 所有样式都在这里集中生成，界面各处只调用，不各自写死颜色，
- * 这样切换个性化后能立即统一生效。
- */
+/** 个性化引擎：主题 / 气泡 / 名称颜色。 */
 public class ThemeEngine {
 
     // ---------- 主题 ----------
@@ -184,12 +174,7 @@ public class ThemeEngine {
         return namePlainColorFor(nameKey());
     }
 
-    /**
-     * 按指定名称颜色 key 取普通色。
-     * default 表示「没有个性化」，必须跟随主题正文色。
-     * 不能让它受金色主题影响变成金色，否则没有设置个性化的用户
-     * 在别人眼里也会被当成金色，个性化就失去区分度了。
-     */
+    /** 按指定名称颜色 key 取普通色。 */
     public static int namePlainColorFor(String key) {
         if ("gold".equals(key)) return 0xFFD4A017;
         return themeText();

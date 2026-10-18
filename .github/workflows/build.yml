@@ -92,6 +92,17 @@ jobs:
           echo "--- app/build.gradle ---"
           cat app/build.gradle 2>/dev/null || echo "app/build.gradle 缺失"
 
+      - name: Verify signing keystore
+        run: |
+          # 上传前先确认 keystore 是完整二进制，不是空文件/文本
+          if [ -f app/keystore.jks ]; then
+            echo "keystore 大小: $(stat -c%s app/keystore.jks) 字节"
+            echo "文件类型: $(file -b app/keystore.jks 2>/dev/null || echo '未知')"
+            od -An -tx1 -N4 app/keystore.jks
+          else
+            echo "app/keystore.jks 不存在"
+          fi
+
       - name: Prepare signing keystore
         env:
           KS_B64:   ${{ secrets.SIGN_KEYSTORE_BASE64 }}

@@ -12,22 +12,9 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/**
- * 图片加载（内存缓存 + 降采样 + 浏览器请求头）。
- *
- * 三个关键点：
- * 1. 浏览器 UA + 验证 cookie：否则服务器前的 WAF 会把图片请求挡下来。
- * 2. 降采样：相册原图动辄几千万像素，直接 decode 会 OOM 导致整个 App 闪退。
- *    这里先读尺寸再按目标大小算出 inSampleSize，只解出需要的尺寸。
- * 3. 有界缓存：用 LruCache 限制总内存，避免图片越攒越多。
- */
+/** 图片加载（内存缓存 + 降采样 + 浏览器请求头）。 */
 public class ImgLoader {
-    /**
-     * 必须绑定主线程 Looper。
-     * 之前是裸 new Handler()，一旦 ImgLoader 在子线程被首次加载（类加载触发），
-     * 就会抛 "Can't create handler inside thread that has not called Looper.prepare()"
-     * —— 这是开屏页一启动就闪退的根因。
-     */
+    /** 必须绑定主线程 Looper。 */
     private static final Handler h = new Handler(android.os.Looper.getMainLooper());
 
     /** 磁盘缓存目录 + 24 小时有效期（切频道/私聊后已加载过的图直接本地取） */
@@ -43,19 +30,25 @@ public class ImgLoader {
         } catch (Throwable ignore) {}
     }
 
-    private static java.io.File diskFile(String url) {
+    /** 缓存键必须带上目标尺寸。 */
+    private static java.io.File diskFile(String url, int maxW, int maxH) {
         if (diskDir == null || url == null) return null;
         String k;
         try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
-            byte[] b = md.digest(url.getBytes("UTF-8"));
+            byte[] b = md.digest((url + "|" + maxW + "x" + maxH).getBytes("UTF-8"));
             StringBuilder sb = new StringBuilder();
             for (byte x : b) sb.append(String.format("%02x", x));
             k = sb.toString();
         } catch (Exception e) {
-            k = String.valueOf(url.hashCode());
+            k = String.valueOf((url + "|" + maxW + "x" + maxH).hashCode());
         }
         return new java.io.File(diskDir, k);
+    }
+
+    /** 兼容旧调用：无尺寸信息时用 0x0 作为桶 */
+    private static java.io.File diskFile(String url) {
+        return diskFile(url, 0, 0);
     }
 
     /** 清掉超过 24 小时的缓存文件 */
@@ -131,7 +124,7 @@ public class ImgLoader {
         if (url == null || url.isEmpty()) return null;
 
         // 先查磁盘缓存（24 小时内有效）
-        java.io.File df = diskFile(url);
+        java.io.File df = diskFile(url, maxW, maxH);
         if (df != null && df.exists()
                 && System.currentTimeMillis() - df.lastModified() < DISK_TTL) {
             Bitmap d = null;
@@ -161,7 +154,9 @@ public class ImgLoader {
             // 第二步：按目标尺寸算采样率后真正解码
             opt = new BitmapFactory.Options();
             opt.inSampleSize = sampleSize(w, hh, maxW, maxH);
-            opt.inPreferredConfig = Bitmap.Config.RGB_565;   // 内存减半，聊天图足够
+            // 大图（全屏预览）用 ARGB_8888 保真；小图用 RGB_565 省内存
+            opt.inPreferredConfig = (maxW >= 720 && maxH >= 720)
+                    ? Bitmap.Config.ARGB_8888 : Bitmap.Config.RGB_565;
             opt.inJustDecodeBounds = false;
 
             c = open(url);

@@ -18,16 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
-/**
- * WebView 网络层。
- *
- * 服务器前面的 WAF 只放行"看起来像浏览器"的请求。
- * WebView 本身就是浏览器：它会自行完成验证并维护 cookie，
- * 页面内的 fetch 是同源请求、cookie 自动带上，因此不会被拦截。
- *
- * 用法：所有数据请求改走这里，Java 通过 evaluateJavascript 触发 fetch，
- * 结果由 JS 通过 XfanBridge 回调回来。
- */
+/** WebView 网络层。 */
 public class WebBridge {
     private static final String TAG = "XFAN-WEB";
 

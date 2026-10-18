@@ -153,11 +153,7 @@ public class ChatFragment extends Fragment {
         } catch (Exception ignore) {}
     }
 
-    /**
-     * UI 是否可用。
-     * fragment 可能在 onCreateView 之前就被 MainActivity 触发加载（切页/拉取资料），
-     * 那时 ad / lv 还是 null，直接访问会空指针闪退。
-     */
+    /** UI 是否可用。 */
     private boolean ready() {
         return isAdded() && getActivity() != null && getView() != null
                 && ad != null && lv != null;
@@ -491,11 +487,45 @@ public class ChatFragment extends Fragment {
     }
 
     // ---------- 图片 ----------
+    /** 点「发送图片」先弹窗：显示当前积分与计费规则，再选图 */
     private void pickImage() {
-        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-        i.setType("image/*");
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        startActivityForResult(i, REQ_PICK);
+        if (getActivity() == null) return;
+
+        LinearLayout box = new LinearLayout(getActivity());
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(40, 24, 40, 12);
+
+        TextView tvPts = new TextView(getActivity());
+        tvPts.setText("当前积分：" + Prefs.points() + " 分");
+        tvPts.setTextSize(14);
+        tvPts.setTextColor(ThemeEngine.themeText());
+        tvPts.setTypeface(null, android.graphics.Typeface.BOLD);
+
+        TextView tvRule = new TextView(getActivity());
+        tvRule.setText("普通图片：按体积计费\n"
+                + "动图（GIF/WEBP）：每 KB 消耗 2 积分\n"
+                + "删除已上传图片：返还 50% 积分");
+        tvRule.setTextSize(12);
+        tvRule.setTextColor(ThemeEngine.themeTextSub());
+        tvRule.setPadding(0, 8, 0, 6);
+
+        box.addView(tvPts);
+        box.addView(tvRule);
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle("发送图片")
+                .setView(box)
+                .setNegativeButton(R.string.btn_close, null)
+                .setPositiveButton("选择图片", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                        // 同时允许静态图与动图
+                        i.setType("image/*");
+                        i.addCategory(Intent.CATEGORY_OPENABLE);
+                        startActivityForResult(i, REQ_PICK);
+                    }
+                })
+                .show();
     }
 
     @Override

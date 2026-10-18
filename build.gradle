@@ -32,7 +32,43 @@ def ksFile    = ksEnvPath ? file(ksEnvPath)
 def ksPwd     = envOr("SIGN_STORE_PASSWORD", "store.password", "xfan123456")
 def kaPwd     = envOr("SIGN_KEY_PASSWORD",   "key.password",   "xfan123456")
 def kaAlias   = envOr("SIGN_KEY_ALIAS",      "key.alias",      "xfan")
-def useFixed  = ksFile.exists()
+
+/**
+ * 真实校验：先试着打开密钥库并用密码取出私钥。
+ * 之前只判断「文件存在」就直接用，一旦密码不对或文件损坏，
+ * 构建会在签名阶段抛 UnrecoverableKeyException / BadPaddingException 直接失败。
+ * 这里提前验一次：验不过就退回默认 debug 签名，构建照样成功，
+ * 并在日志里打印明确原因，而不是一堆看不懂的堆栈。
+ */
+def ksUsable = false
+def ksReason = "keystore 文件不存在：${ksFile}"
+if (ksFile.exists()) {
+    for (String typeName in ["JKS", "PKCS12"]) {
+        try {
+            def ks = java.security.KeyStore.getInstance(typeName)
+            ks.load(new FileInputStream(ksFile), ksPwd.toCharArray())
+            def chain = ks.getCertificateChain(kaAlias)
+            if (chain == null || chain.length == 0) {
+                ksReason = "密钥库里找不到别名 '${kaAlias}'"
+                continue
+            }
+            def key = ks.getKey(kaAlias, kaPwd.toCharArray())
+            if (key == null) {
+                ksReason = "别名 '${kaAlias}' 存在但取不出私钥（key 密码可能不对）"
+                continue
+            }
+            ksUsable = true
+            ksReason = "OK（${typeName} 格式，别名 ${kaAlias}）"
+            break
+        } catch (Throwable t) {
+            ksReason = "以 ${typeName} 打开失败：${t.class.simpleName}: ${t.message}"
+        }
+    }
+}
+println("[signing] keystore=${ksFile}  usable=${ksUsable}  reason=${ksReason}")
+if (!ksUsable) {
+    println("[signing] !!! 固定签名不可用，本次改用默认 debug 密钥（安装时会与旧包冲突）")
+}
 
 android {
     namespace "xfan.chat.app"
@@ -69,7 +105,7 @@ android {
     signingConfigs {
         // 用显式 create：在容器闭包里写 if 时比 fixed{} 更稳，
         // 避免不同 Gradle 版本对方法缺失转发的差异。
-        if (useFixed) {
+        if (ksUsable) {
             create("fixed") {
                 storeFile     ksFile
                 storePassword ksPwd
@@ -82,7 +118,7 @@ android {
     buildTypes {
         debug {
             // 有固定 keystore 就覆盖 debug 的默认临时密钥
-            if (useFixed) {
+            if (ksUsable) {
                 signingConfig signingConfigs.getByName("fixed")
             }
         }

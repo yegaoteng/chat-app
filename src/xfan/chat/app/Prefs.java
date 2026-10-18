@@ -40,6 +40,11 @@ public class Prefs {
     public static String uid() { return get("uid", ""); }
     public static void uid(String v) { put("uid", v); }
 
+    public static int points() {
+        try { return Integer.parseInt(get("points", "0")); } catch (Exception e) { return 0; }
+    }
+    public static void points(int v) { put("points", String.valueOf(v)); }
+
     public static String theme() { return get("theme", "default"); }
     public static void theme(String v) { put("theme", v); }
 

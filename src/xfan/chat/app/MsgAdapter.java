@@ -27,12 +27,7 @@ public class MsgAdapter extends BaseAdapter {
         void onImage(String content);
     }
 
-    /**
-     * 长按回调。
-     * 图片消息里的 ImageView 设了 OnClickListener 后会变成 clickable，
-     * ListView 的 onItemLongClick 就收不到事件了（这正是「图片长按没反应」的原因）。
-     * 所以图片要自己挂长按并转发给外层。
-     */
+    /** 长按回调。 */
     public interface OnItemLongClick {
         void onLongClick(int pos);
     }

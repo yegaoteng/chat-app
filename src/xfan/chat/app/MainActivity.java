@@ -307,6 +307,7 @@ public class MainActivity extends Activity {
                     public void run() {
                         if (r == null || !r.optBoolean("success", false)) return;
                         final int pts = r.optInt("points", 0);
+                        Prefs.points(pts);
                         Prefs.user(r.optString("username", Prefs.user()));
                         Prefs.theme(r.optString("theme", "default"));
                         Prefs.bubble(r.optString("bubble", "default"));
@@ -411,7 +412,7 @@ public class MainActivity extends Activity {
 
         final TextView btn = new TextView(this);
         btn.setText("每日签到 (+50)");
-        btn.setTextColor(getResources().getColor(R.color.text_drawer));
+        btn.setTextColor(0xFF222222);
         btn.setTextSize(14);
         btn.setPadding(10, 12, 10, 12);
         btn.setLayoutParams(new LinearLayout.LayoutParams(0,
@@ -467,7 +468,7 @@ public class MainActivity extends Activity {
 
         TextView btn = new TextView(this);
         btn.setText("兑换");
-        btn.setTextColor(getResources().getColor(R.color.text_drawer));
+        btn.setTextColor(0xFF222222);
         btn.setTextSize(14);
         btn.setPadding(10, 12, 10, 12);
         asButton(btn);
@@ -557,11 +558,18 @@ public class MainActivity extends Activity {
             if (!has && price > 0) label += "（" + price + " 分）";
             if (key.equals(cur)) label += "  ✓";
             row.setText(label);
-            row.setTextColor(getResources().getColor(R.color.text_drawer));
+            final boolean on = key.equals(cur);
+            row.setTextColor(on ? 0xFF2979FF : 0xFF222222);
             row.setTextSize(13);
-            row.setPadding(12, 10, 12, 10);
-            if (key.equals(cur)) asButtonOn(row); else asButton(row);
+            row.setPadding(14, 11, 14, 11);
+            if (on) asButtonOn(row); else asButton(row);
             markStyle(row, kind);
+            // 项间距 +1px
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = 7;      // 原 6 + 1
+            row.setLayoutParams(lp);
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { setStyle(kind, key, has, price); }
             });

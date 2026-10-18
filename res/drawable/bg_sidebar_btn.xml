@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 未选中：白底、浅灰边框、接近直角（radius 3dp） -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#1A5FE3F0" />
-    <stroke android:width="1dp" android:color="#665FE3F0" />
-    <corners android:radius="10dp" />
+    <solid android:color="#FFFFFFFF" />
+    <stroke android:width="1dp" android:color="#FFBDBDBD" />
+    <corners android:radius="3dp" />
 </shape>

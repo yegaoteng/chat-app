@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -16,7 +17,10 @@ public class LoginActivity extends Activity {
     private EditText edUser, edPass, edInvite, edUid;
     private TextView tvUidTip;
     private Button btnLogin, btnRegister, btnWeb;
-    private TextView tvTip;
+    private TextView tvTip, tvTitle, tvCaret, tvLogging;
+    private ProgressBar pbLogin;
+    private View boxLogin;
+    private Handler hTitle = new Handler(android.os.Looper.getMainLooper());
     private boolean regMode = false;
 
     @Override
@@ -45,6 +49,13 @@ public class LoginActivity extends Activity {
         tvTip    = findViewById(R.id.tvTip);
 
         btnWeb = findViewById(R.id.btnWeb);
+
+        tvTitle  = findViewById(R.id.tvTitle);
+        tvCaret  = findViewById(R.id.tvCaret);
+        tvLogging= findViewById(R.id.tvLogging);
+        pbLogin  = findViewById(R.id.pbLogin);
+        boxLogin = findViewById(R.id.boxLogin);
+        startTypewriter();
 
         String u = Prefs.user();
         if (u != null && !u.isEmpty()) edUser.setText(u);
@@ -105,6 +116,95 @@ public class LoginActivity extends Activity {
                 return false;
             }
         });
+    }
+
+    /** 标题打字机效果（带闪烁光标） */
+    private void startTypewriter() {
+        if (tvTitle == null) return;
+        final String full = getString(R.string.app_name);
+        final int[] idx = {0};
+
+        // 光标闪烁
+        final Runnable blink = new Runnable() {
+            public void run() {
+                if (tvCaret == null) return;
+                tvCaret.setVisibility(tvCaret.getVisibility() == View.VISIBLE
+                        ? View.INVISIBLE : View.VISIBLE);
+                hTitle.postDelayed(this, 500);
+            }
+        };
+        hTitle.post(blink);
+
+        Runnable type = new Runnable() {
+            public void run() {
+                if (tvTitle == null) return;
+                if (idx[0] <= full.length()) {
+                    tvTitle.setText(full.substring(0, idx[0]));
+                    idx[0]++;
+                    hTitle.postDelayed(this, 150);   // 每个字符 150ms
+                }
+            }
+        };
+        hTitle.postDelayed(type, 400);
+    }
+
+    /** 收起输入法 */
+    private void hideKeyboard() {
+        try {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager)
+                            getSystemService(INPUT_METHOD_SERVICE);
+            if (imm == null) return;
+            View v = getCurrentFocus();
+            if (v != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+        } catch (Throwable ignore) {}
+    }
+
+    /** 登录中：顶部提示 + 6 秒进度条（从右往左） */
+    private void showLogging() {
+        hideKeyboard();
+        if (tvLogging != null) tvLogging.setVisibility(View.VISIBLE);
+        if (pbLogin == null) return;
+        pbLogin.setVisibility(View.VISIBLE);
+        pbLogin.setProgress(100);
+
+        final int TOTAL = 6000, STEP = 60;
+        final int[] left = {TOTAL};
+        hTitle.post(new Runnable() {
+            public void run() {
+                left[0] -= STEP;
+                if (left[0] < 0) left[0] = 0;
+                // 从右往左：进度条随时间推移逐渐清空
+                pbLogin.setProgress((int) (left[0] * 100L / TOTAL));
+                if (left[0] > 0) hTitle.postDelayed(this, STEP);
+            }
+        });
+    }
+
+    private void hideLogging() {
+        hTitle.removeCallbacksAndMessages(null);
+        if (tvLogging != null) tvLogging.setVisibility(View.GONE);
+        if (pbLogin != null) pbLogin.setVisibility(View.GONE);
+    }
+
+    /** 登录成功后：布局从四面平移出来 */
+    private void animateContent() {
+        if (boxLogin == null) return;
+        // 用 ScaleAnimation 的轴心模拟从四面扩散：先整体缩小再放大归位
+        android.view.animation.AnimationSet set =
+                new android.view.animation.AnimationSet(true);
+
+        android.view.animation.ScaleAnimation sc =
+                new android.view.animation.ScaleAnimation(
+                        0.88f, 1f, 0.88f, 1f,
+                        android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f,
+                        android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f);
+        android.view.animation.AlphaAnimation al =
+                new android.view.animation.AlphaAnimation(0f, 1f);
+        set.addAnimation(sc);
+        set.addAnimation(al);
+        set.setDuration(420);
+        boxLogin.startAnimation(set);
     }
 
     /** 浏览器登录成功后跳回：xfan://auth?token=xxx&user=yyy&test=zzz */
@@ -168,7 +268,8 @@ public class LoginActivity extends Activity {
         if (!checkInput()) return;
         final String u = edUser.getText().toString().trim();
         final String p = edPass.getText().toString().trim();
-        setBusy(true, "登录中…");
+        setBusy(true, "");
+        showLogging();
         new Thread(new Runnable() {
             public void run() {
                 JSONObject body = new JSONObject();
@@ -180,6 +281,7 @@ public class LoginActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     public void run() {
                         setBusy(false, "");
+                        hideLogging();
                         if (r == null) { showErr("登录失败"); return; }
                         if (!r.optBoolean("success", false)) {
                             toast(r.optString("error", "登录失败"));
@@ -196,7 +298,10 @@ public class LoginActivity extends Activity {
                         Prefs.pass(p);
                         String gotUid = r.optString("uid", "");
                         if (!gotUid.isEmpty()) Prefs.uid(gotUid);
-                        enterMain();
+                        animateContent();
+                        hTitle.postDelayed(new Runnable() {
+                            public void run() { enterMain(); }
+                        }, 430);
                     }
                 });
             }
@@ -236,7 +341,8 @@ public class LoginActivity extends Activity {
 
     private void doRegisterFinal(final String u, final String uid,
                                  final String p, final String inv) {
-        setBusy(true, "注册中…");
+        setBusy(true, "");
+        showLogging();
         new Thread(new Runnable() {
             public void run() {
                 JSONObject body = new JSONObject();
@@ -250,6 +356,7 @@ public class LoginActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     public void run() {
                         setBusy(false, "");
+                        hideLogging();
                         if (r == null) { showErr("登录失败"); return; }
                         if (!r.optBoolean("success", false)) {
                             toast(r.optString("error", "注册失败"));

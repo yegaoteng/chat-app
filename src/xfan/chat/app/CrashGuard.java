@@ -10,12 +10,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-/**
- * 崩溃兜底：记录崩溃堆栈，下次启动时可查看/复制。
- *
- * 目的：闪退发生在主线程之外时界面上什么提示都没有，
- * 只能猜。这里把堆栈存下来，下次打开登录页直接展示，便于定位。
- */
+/** 崩溃兜底：记录崩溃堆栈，下次启动时可查看/复制。 */
 public class CrashGuard {
 
     private static final String PREF = "xfan_crash";

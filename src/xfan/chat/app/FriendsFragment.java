@@ -35,6 +35,7 @@ public class FriendsFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inf, ViewGroup c, Bundle b) {
         View v = inf.inflate(R.layout.frag_friends, c, false);
+        rootView = v;
         lvChannel = v.findViewById(R.id.lvChannel);
         lvFriend = v.findViewById(R.id.lvFriend);
         Button btnJoin = v.findViewById(R.id.btnJoin);
@@ -264,14 +265,26 @@ public class FriendsFragment extends Fragment {
         if (!hidden) load();
     }
 
+    private View rootView;
+
     // ---------- 数据 ----------
     private void load() {
         loadChannels();
         loadFriends();
     }
 
+    /** 好友列表加载中：显示转圈，完成后隐藏 */
+    private void showLoading(final boolean on) {
+        if (rootView == null) return;
+        View bar = rootView.findViewById(R.id.loadingFriend);
+        View lv  = rootView.findViewById(R.id.lvFriend);
+        if (bar != null) bar.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (lv != null) lv.setVisibility(on ? View.GONE : View.VISIBLE);
+    }
+
     /** 失败时说明原因，避免界面停在“加载中”却毫无反馈 */
     private void why(JSONObject r) {
+        showLoading(false);
         String msg = (r == null)
                 ? ("网络错误\n" + Api.lastUrl + "\n" + Api.lastError)
                 : r.optString("error", "加载失败");
@@ -310,12 +323,14 @@ public class FriendsFragment extends Fragment {
     }
 
     private void loadFriends() {
+        showLoading(true);
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=friends");
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
+                        showLoading(false);
                         if (r == null || !r.optBoolean("success", false)) { why(r); return; }
                         JSONArray arr = r.optJSONArray("friends");
                         if (arr == null) return;

@@ -57,7 +57,7 @@
     <string name="msg_copy">复制</string>
 
     <string name="btn_web_login">在浏览器中登录</string>
-    <string name="web_login_tip">若直连被服务器拦截，可改用浏览器登录后再跳回本应用</string>
+    <string name="web_login_tip">如果直接登录/注册失败，请使用浏览器登录</string>
     <string name="web_login_ok">登录成功，正在返回应用…</string>
     <string name="err_no_scheme">跳转链接生成失败</string>
     <string name="msg_net_error">网络错误</string>

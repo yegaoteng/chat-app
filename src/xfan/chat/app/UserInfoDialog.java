@@ -11,12 +11,7 @@ import android.widget.TextView;
 
 import org.json.JSONObject;
 
-/**
- * 用户资料卡：点头像 / 点昵称时弹出。
- *
- * 展示：头像（可放大）、昵称（用对方自己的名称颜色）、UID、积分、
- *      在线状态、个人简介，以及加好友 / 发消息 两个操作。
- */
+/** 用户资料卡：点头像 / 点昵称时弹出。 */
 public class UserInfoDialog {
 
     /** 弹出资料卡。host 用于提供 Activity 与后续操作入口。 */
@@ -118,7 +113,7 @@ public class UserInfoDialog {
                 .setNegativeButton(R.string.btn_close, null);
 
         if (!isSelf) {
-            bld.setPositiveButton(isFriend ? "发消息" : "加为好友",
+            bld.setPositiveButton(isFriend ? "发消息" : "申请好友",
                     new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dg, int w) {
                             if (isFriend) {

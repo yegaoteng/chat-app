@@ -13,22 +13,7 @@ import android.widget.TextView;
 
 import java.io.InputStream;
 
-/**
- * 开屏画面。
- *
- * 【自定义图片 · 支持 jpg / png / webp】
- * 把你的图片放到 app/assets/ 目录，命名为以下任一即可，程序会自动识别：
- *     app/assets/splash.png
- *     app/assets/splash.jpg   （或 .jpeg）
- *     app/assets/splash.webp
- * 三种格式任选其一，不需要改任何代码。assets 里没有图时，
- * 自动回退到 res/drawable/splash.png（横屏用 drawable-land/ 下那张）。
- *
- * 横竖屏：图片按 centerCrop 居中裁切填满屏幕，不会拉伸变形。
- *        竖屏建议 1080x1920，横屏建议 1920x1080；只放一张也能用。
- *
- * 停留 SPLASH_MS 毫秒后跳转：已登录 -> MainActivity，否则 -> LoginActivity。
- */
+/** 开屏画面。 */
 public class SplashActivity extends Activity {
 
     private static final int SPLASH_MS = 1500;
@@ -58,16 +43,7 @@ public class SplashActivity extends Activity {
         }, SPLASH_MS);
     }
 
-    /**
-     * 载入开屏图：只从 assets 读（支持 jpg / png / webp）。
-     *
-     * 注意：不要在 res/drawable 下放开屏图！
-     * Android 资源以「文件名去掉扩展名」作为资源名，
-     * 如果 drawable 里同时出现 splash.png 和 splash.jpg，
-     * 会被判定为同名资源，构建时报：
-     *     Duplicate resources: drawable/splash, drawable/splash
-     * assets 目录没有这个限制，所以开屏图统一放 assets。
-     */
+    /** 载入开屏图：只从 assets 读（支持 jpg / png / webp）。 */
     private void showSplash() {
         ImageView iv = findViewById(R.id.ivSplash);
         if (iv == null) return;

@@ -25,12 +25,7 @@ public class Api {
     /** 最后一次失败的详情：HTTP 码 / 异常 / 返回片段 */
     public static String lastError = "";
 
-    /**
-     * 全站强制 GET。
-     * 该主机上 POST 会被网关拦截（400 Bad Request / openresty），
-     * 而 GET 实测可正常返回 JSON，所以所有请求一律走 GET。
-     * 副作用：参数（含密码）会出现在 URL 里，服务端 access log 可能记录。
-     */
+    /** 全站强制 GET。 */
     public static final boolean USE_GET_ONLY = true;
 
     // true = 走 WebView 发请求（浏览器身份，可绕过 WAF 验证）

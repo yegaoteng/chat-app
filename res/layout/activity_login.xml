@@ -6,6 +6,7 @@
     android:fillViewport="true">
 
     <LinearLayout
+        android:id="@+id/boxLogin"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -19,14 +20,54 @@
             android:src="@mipmap/ic_launcher"
             android:contentDescription="@string/app_name" />
 
-        <TextView
+        <!-- 打字机效果标题 -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:text="@string/app_name"
-            android:textColor="@color/text_light"
-            android:textSize="20sp"
-            android:textStyle="bold" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_light"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/tvCaret"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_light"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:typeface="monospace"
+                android:text="|" />
+        </LinearLayout>
+
+        <!-- 登录中提示（顶部） -->
+        <TextView
+            android:id="@+id/tvLogging"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="正在使你登录，请稍等!"
+            android:textColor="#FFB74D"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- 6 秒进度条 -->
+        <ProgressBar
+            android:id="@+id/pbLogin"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:layout_marginTop="8dp"
+            android:max="100"
+            android:visibility="gone" />
 
         <EditText
             android:id="@+id/edUser"

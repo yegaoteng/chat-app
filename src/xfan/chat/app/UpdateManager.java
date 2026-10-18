@@ -9,16 +9,7 @@ import android.net.Uri;
 
 import org.json.JSONObject;
 
-/**
- * 版本更新：启动自动检查 + 我的页手动检查。
- *
- * 判定规则（比单纯比 version_code 更稳）：
- *   1) 服务器 version_code 比本地大            -> 有更新
- *   2) version_code 相同但版本名不同且服务器更高 -> 有更新
- *
- * 规则 2 很重要：后台只改了版本名（如 1.0 -> 1.0.1）而没动版本码时，
- * 旧逻辑会判定「没有更新」，用户永远收不到提示。
- */
+/** 版本更新：启动自动检查 + 我的页手动检查。 */
 public class UpdateManager {
 
     /** 本地版本名，如 "1.0.1" */

@@ -95,6 +95,30 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <!-- 好友列表加载中：标准转圈 + 文字 -->
+    <LinearLayout
+        android:id="@+id/loadingFriend"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:indeterminate="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="加载中"
+            android:textColor="@color/text_sub"
+            android:textSize="13sp" />
+    </LinearLayout>
+
     <ListView
         android:id="@+id/lvFriend"
         android:layout_width="match_parent"

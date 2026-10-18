@@ -39,11 +39,13 @@ public class ImageViewActivity extends Activity {
 
         if (url == null || url.isEmpty()) { Toast.makeText(this, "地址为空", Toast.LENGTH_SHORT).show(); return; }
 
+        final int want = screen() * 2;   // 2 倍短边：放大后细节足够，不会糊
+
         new Thread(new Runnable() {
             public void run() {
                 try {
                     // 走 ImgLoader：带浏览器头与验证 cookie，否则会被 WAF 拦下
-                    final Bitmap bm = ImgLoader.fetch(url, screen(), screen());
+                    final Bitmap bm = ImgLoader.fetch(url, want, want);
                     if (bm == null) throw new Exception("null");
                     runOnUiThread(new Runnable() {
                         public void run() { iv.setImageBitmap(bm); }
@@ -59,7 +61,7 @@ public class ImageViewActivity extends Activity {
         }).start();
     }
 
-    /** 取屏幕短边，全屏看图按这个尺寸解码即可 */
+    /** 取屏幕短边 */
     private int screen() {
         try {
             android.util.DisplayMetrics dm = new android.util.DisplayMetrics();
