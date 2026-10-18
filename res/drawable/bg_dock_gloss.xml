@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dock 顶部高光：盖在文字上层，制造玻璃反光 -->
+<!-- Dock 顶部高光：白底上只用极淡的一层，避免冲淡图标 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
         android:angle="270"
         android:endColor="#00000000"
-        android:startColor="#2EFFFFFF"
+        android:startColor="#14FFFFFF"
         android:type="linear" />
     <corners android:radius="24dp" />
 </shape>

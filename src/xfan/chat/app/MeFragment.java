@@ -354,19 +354,33 @@ public class MeFragment extends Fragment {
                 new android.widget.CompoundButton.OnCheckedChangeListener() {
                     public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
                         if (!on) { toast("已关闭通知"); return; }
+                        MainActivity a = (getActivity() instanceof MainActivity)
+                                ? (MainActivity) getActivity() : null;
+                        if (a == null) return;
+                        if (Notify.granted(a)) return;
                         if (android.os.Build.VERSION.SDK_INT < 33) {
                             toast("当前系统无需额外授权");
                             return;
                         }
-                        if (getActivity() == null) return;
-                        if (((MainActivity) getActivity()).checkSelfPermission(
-                                android.Manifest.permission.POST_NOTIFICATIONS)
-                                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                            ((MainActivity) getActivity()).requestPermissions(
-                                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
-                                    9001);
-                            toast("请在弹出的系统框里允许通知");
+                        // 用户之前拒过：系统不会再弹框，直接送去设置页
+                        if (a.shouldShowRequestPermissionRationale(
+                                android.Manifest.permission.POST_NOTIFICATIONS)) {
+                            toast("通知曾被拒绝，请在系统设置里开启");
+                            try {
+                                a.startActivity(new android.content.Intent(
+                                        android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
+                                                a.getPackageName()));
+                            } catch (Throwable ignore) {}
+                            sw.setChecked(false);
+                            return;
                         }
+                        // 授权结果回来后同步开关（见 MainActivity.onRequestPermissionsResult）
+                        MainActivity.notifyCallback(new Runnable() {
+                            public void run() { sw.setChecked(Notify.granted(getActivity())); }
+                        });
+                        a.ensureNotifyPermission();
+                        toast("请在弹出的系统框里允许通知");
                     }
                 });
         rowN.addView(sw);
@@ -393,13 +407,10 @@ public class MeFragment extends Fragment {
         return v <= 0 ? "跟随系统" : (v + " Hz");
     }
 
+    /** 按钮就叫「设置」，帧率档位放到二级弹窗里显示 */
     private void refreshFpsLabel() {
         if (btnDisplay == null) return;
-        int f = Prefs.fps();
-        float hz = (getActivity() == null) ? 60f : Fps.screenHz(getActivity());
-        btnDisplay.setText(f > 0
-                ? ("显示设置（" + f + " Hz）")
-                : ("显示设置（跟随 " + Math.round(hz) + " Hz）"));
+        btnDisplay.setText("设置");
     }
 
     /** 全屏查看自己的头像；没有头像时提示先上传 */

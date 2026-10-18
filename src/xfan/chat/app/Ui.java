@@ -66,12 +66,8 @@ public final class Ui {
                 View v = d.getWindow() == null ? null
                         : d.getWindow().findViewById(android.R.id.button1 + (w + 1));
                 if (v != null) {
-                    View parent = (v.getParent() instanceof View)
-                            ? (View) v.getParent() : null;
-                    if (parent != null) {
-                        parent.setPadding(8, 8, 8, 8);
-                        outline(parent, 0x00000000, 0x99FFFFFF);
-                    }
+                    // 只换背景，不动 padding：改 padding 会触发整个窗口 relayout，弹窗会闪一下
+                    outline(v, 0x00000000, 0x99FFFFFF);
                 }
             }
         } catch (Throwable ignore) {}

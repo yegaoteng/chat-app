@@ -177,8 +177,9 @@ public class Glass {
             android.graphics.drawable.GradientDrawable gd =
                     new android.graphics.drawable.GradientDrawable();
             gd.setCornerRadius(r);
-            gd.setColor(0xD91B1B28);
-            gd.setStroke(1, 0x66FFFFFF);
+            // 白色玻璃：深色底会让整个 Dock 看起来发灰
+            gd.setColor(0xF2FFFFFF);
+            gd.setStroke(1, 0x33000000);
             v.setBackgroundDrawable(gd);
             if (android.os.Build.VERSION.SDK_INT >= 21) {
                 try {

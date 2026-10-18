@@ -195,8 +195,17 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         foreground = true;
-        // 每次回到前台都确认通知权限，没授权就申请
-        try { ensureNotifyPermission(); } catch (Throwable ignore) {}
+        // 每次进入都「检查」权限状态，但绝不在这里弹系统授权框。
+        // 之前在 onResume 里无条件 requestPermissions：
+        //   授权框出现 -> Activity onPause -> 框消失 -> onResume -> 再次请求…
+        // 形成死循环，表现为所有弹窗闪屏、按钮点不动（触摸被授权框窗口吞掉）。
+        // 冷启动且从未问过时才自动问一次，之后只由用户点开关触发。
+        try {
+            if (Prefs.get("notify_asked", "0").equals("0")) {
+                Prefs.put("notify_asked", "1");
+                ensureNotifyPermission();
+            }
+        } catch (Throwable ignore) {}
     }
 
     @Override
@@ -209,15 +218,32 @@ public class MainActivity extends Activity {
      * 通知权限：Android 13+ 必须显式授权。
      * 未授权就什么也不做（保持关闭），不会反复骚扰。
      */
-    public void ensureNotifyPermission() {
-        if (android.os.Build.VERSION.SDK_INT < 33) return;
+    /** 返回 true 表示已经弹了系统授权框 */
+    public boolean ensureNotifyPermission() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return false;
         try {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9001);
-            }
-        } catch (Throwable ignore) {}
+                    == android.content.pm.PackageManager.PERMISSION_GRANTED) return false;
+            requestPermissions(
+                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9001);
+            return true;
+        } catch (Throwable ignore) {
+            return false;
+        }
+    }
+
+    /** 通知权限授权结果回来后的回调（由设置弹窗里的开关注册） */
+    private static Runnable notifyCb = null;
+
+    public static void notifyCallback(Runnable r) { notifyCb = r; }
+
+    @Override
+    public void onRequestPermissionsResult(int code, String[] ps, int[] res) {
+        super.onRequestPermissionsResult(code, ps, res);
+        if (code == 9001 && notifyCb != null) {
+            try { notifyCb.run(); } catch (Throwable ignore) {}
+            notifyCb = null;
+        }
     }
 
     @Override
