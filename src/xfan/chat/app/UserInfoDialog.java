@@ -128,7 +128,8 @@ public class UserInfoDialog {
 
         // ---- 在线 / 积分 ----
         TextView tvMeta = new TextView(host.getActivity());
-        tvMeta.setText((online ? "在线" : "离线") + " · " + pts + " 积分");
+        // 按需求不再展示对方积分
+        tvMeta.setText(online ? "在线" : "离线");
         tvMeta.setTextSize(12);
         tvMeta.setGravity(Gravity.CENTER);
         tvMeta.setPadding(0, 6, 0, 0);

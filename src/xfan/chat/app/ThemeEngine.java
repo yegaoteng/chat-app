@@ -90,7 +90,7 @@ public class ThemeEngine {
             if (bot != null) bot.setBackgroundDrawable(null);
             View glass = a.findViewById(R.id.dockGlass);
             if (glass != null) {
-                Glass.background(glass, false, 24f);
+                Glass.dock(glass, 24f);
                 try { glass.getOverlay().clear(); } catch (Throwable ignore) {}
             }
 

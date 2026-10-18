@@ -21,12 +21,20 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- 当前会话背景：不透明度 20%，让消息更清楚 -->
+        <!-- 会话背景：不透过主题色（底板设为中性黑，金色主题不会把它染黄） -->
+        <View
+            android:id="@+id/chatBgBase"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FF101014"
+            android:visibility="gone" />
+
+        <!-- 当前会话背景：不透明度 80% -->
         <ImageView
             android:id="@+id/ivChatBg"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:alpha="0.2"
+            android:alpha="0.8"
             android:adjustViewBounds="false"
             android:scaleType="centerCrop"
             android:visibility="gone" />
@@ -102,7 +110,7 @@
                 android:paddingLeft="12dp"
                 android:paddingRight="12dp"
                 android:text="发送图片"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#FF000000"
                 android:textSize="13sp" />
 
             <Button
@@ -115,7 +123,7 @@
                 android:paddingLeft="12dp"
                 android:paddingRight="12dp"
                 android:text="我的上传"
-                android:textColor="#FFFFFFFF"
+                android:textColor="#FF000000"
                 android:textSize="13sp" />
 
             <View

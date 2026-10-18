@@ -111,7 +111,7 @@ public class ImgLoader {
         if (iv == null || url == null || url.isEmpty()) return;
         iv.setImageDrawable(null);
         iv.setTag(url);
-        Bitmap b = cached(url);
+        Bitmap b = cached(url, maxW, maxH);
         if (b != null) { iv.setImageBitmap(b); return; }
 
         new Thread(new Runnable() {
@@ -155,7 +155,7 @@ public class ImgLoader {
             } catch (Throwable ignore) {
                 d = null;
             }
-            if (d != null) { put(url, d); return d; }
+            if (d != null) { put(url, maxW, maxH, d); return d; }
         }
 
         HttpURLConnection c = null;
@@ -185,6 +185,7 @@ public class ImgLoader {
             InputStream in = c.getInputStream();
             Bitmap bm = BitmapFactory.decodeStream(in, null, opt);
             try { in.close(); } catch (Throwable ignore) {}
+            if (bm != null) put(url, maxW, maxH, bm);
             if (bm != null && df != null) {
                 try {
                     java.io.FileOutputStream fos = new java.io.FileOutputStream(df);
@@ -249,13 +250,23 @@ public class ImgLoader {
     }
 
     // ---------- 缓存 ----------
-    public static Bitmap cached(String url) {
+    /**
+     * 内存缓存的 key 必须带上尺寸。
+     * 之前只用裸 URL：列表先以 96px 缓存头像，全屏预览再取同一个 key，
+     * 拿到的就是那张 96px 的小图 —— 表现就是「刚上传看清，重进就糊」。
+     */
+    public static Bitmap cached(String url, int maxW, int maxH) {
         if (url == null) return null;
-        try { return cache.get(url); } catch (Throwable e) { return null; }
+        try { return cache.get(url + "|" + maxW + "x" + maxH); } catch (Throwable e) { return null; }
     }
 
-    public static void put(String url, Bitmap b) {
+    /** 兼容旧调用：视为 0x0 桶 */
+    public static Bitmap cached(String url) { return cached(url, 0, 0); }
+
+    public static void put(String url, int maxW, int maxH, Bitmap b) {
         if (url == null || b == null) return;
-        try { cache.put(url, b); } catch (Throwable ignore) {}
+        try { cache.put(url + "|" + maxW + "x" + maxH, b); } catch (Throwable ignore) {}
     }
+
+    public static void put(String url, Bitmap b) { put(url, 0, 0, b); }
 }

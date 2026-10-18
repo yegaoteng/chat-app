@@ -94,13 +94,10 @@ public class MeFragment extends Fragment {
             public void onClick(View v2) { checkUpdate(); }
         });
         // 显示设置：选帧率（60/90/120/144）
+        // 「显示设置」改为「设置」：里层再放显示设置与通知权限
+        if (btnDisplay != null) btnDisplay.setText("设置");
         btnDisplay.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v2) {
-                if (getActivity() == null) return;
-                Fps.show(getActivity(), new Runnable() {
-                    public void run() { refreshFpsLabel(); }
-                });
-            }
+            public void onClick(View v2) { showSettings(); }
         });
         refreshFpsLabel();
         btnLogout.setOnClickListener(new View.OnClickListener() {
@@ -123,7 +120,7 @@ public class MeFragment extends Fragment {
         if (getActivity() != null) Fps.apply(getActivity(), Prefs.fps());
         // 视图刚建好：如果资料早就回来了，这里补一次
         // 先用本地缓存填一次，避免刚进来右上角/积分位是空的、等网络回来才补
-        if (tvPts != null) tvPts.setText(Prefs.points() + " 分");
+        if (tvPts != null) tvPts.setText(Prefs.points() + " 积分");
         if (tvName != null && !Prefs.user().isEmpty()) tvName.setText(Prefs.user());
         if (tvUid != null && !Prefs.uid().isEmpty()) tvUid.setText("UID：" + Prefs.uid());
 
@@ -153,7 +150,7 @@ public class MeFragment extends Fragment {
         if (tvUid != null) {
             tvUid.setText(myUid.isEmpty() ? "" : ("UID：" + myUid));
         }
-        tvPts.setText(r.optInt("points", 0) + " 分");
+        tvPts.setText(r.optInt("points", 0) + " 积分");
         inviteCode = r.optString("invite_code", "");
         // 按钮上直接显示真实邀请码，不用点进去才知道
         if (btnInvite != null) {
@@ -305,6 +302,97 @@ public class MeFragment extends Fragment {
     }
 
     /** 按钮上直接显示当前帧率档位 */
+    /**
+     * 设置弹窗：
+     *   - 显示设置：按钮，点进去是二级弹窗（帧率档位）
+     *   - 通知权限：开关，打开后向系统申请；没授权就保持关闭
+     */
+    private void showSettings() {
+        if (getActivity() == null) return;
+        android.widget.LinearLayout box = new android.widget.LinearLayout(getActivity());
+        box.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = (int) (14 * getResources().getDisplayMetrics().density + 0.5f);
+        box.setPadding(pad, pad, pad, pad);
+
+        // 显示设置（按钮）
+        final android.widget.TextView rowFps = new android.widget.TextView(getActivity());
+        rowFps.setText("显示设置（当前 " + fpsLabel() + "）");
+        rowFps.setTextColor(0xFF222222);
+        rowFps.setTextSize(15);
+        rowFps.setPadding(pad, pad, pad, pad);
+        Ui.outline(rowFps, 0xFFF5F5F7, 0xFF2979FF);
+        rowFps.setOnClickListener(new android.view.View.OnClickListener() {
+            public void onClick(android.view.View v2) {
+                Fps.show(getActivity(), new Runnable() {
+                    public void run() {
+                        refreshFpsLabel();
+                        rowFps.setText("显示设置（当前 " + fpsLabel() + "）");
+                    }
+                });
+            }
+        });
+        box.addView(rowFps);
+
+        // 通知权限（开关）
+        android.widget.LinearLayout rowN = new android.widget.LinearLayout(getActivity());
+        rowN.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+        rowN.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        rowN.setPadding(pad, pad, pad, pad);
+        Ui.outline(rowN, 0xFFF5F5F7, 0xFF2979FF);
+
+        android.widget.TextView lab = new android.widget.TextView(getActivity());
+        lab.setText("通知权限");
+        lab.setTextColor(0xFF222222);
+        lab.setTextSize(15);
+        lab.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        rowN.addView(lab);
+
+        final android.widget.Switch sw = new android.widget.Switch(getActivity());
+        sw.setChecked(Notify.granted(getActivity()));
+        sw.setOnCheckedChangeListener(
+                new android.widget.CompoundButton.OnCheckedChangeListener() {
+                    public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                        if (!on) { toast("已关闭通知"); return; }
+                        if (android.os.Build.VERSION.SDK_INT < 33) {
+                            toast("当前系统无需额外授权");
+                            return;
+                        }
+                        if (getActivity() == null) return;
+                        if (((MainActivity) getActivity()).checkSelfPermission(
+                                android.Manifest.permission.POST_NOTIFICATIONS)
+                                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                            ((MainActivity) getActivity()).requestPermissions(
+                                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                                    9001);
+                            toast("请在弹出的系统框里允许通知");
+                        }
+                    }
+                });
+        rowN.addView(sw);
+
+        android.widget.LinearLayout.LayoutParams lpN =
+                new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        lpN.topMargin = pad / 2;
+        box.addView(rowN, lpN);
+
+        android.app.AlertDialog d = new android.app.AlertDialog.Builder(getActivity())
+                .setTitle("设置")
+                .setView(box)
+                .setPositiveButton("关闭", null)
+                .create();
+        d.show();
+        Ui.outlineButtons(d);
+    }
+
+    /** 帧率的简短文案 */
+    private String fpsLabel() {
+        int v = Prefs.fps();
+        return v <= 0 ? "跟随系统" : (v + " Hz");
+    }
+
     private void refreshFpsLabel() {
         if (btnDisplay == null) return;
         int f = Prefs.fps();

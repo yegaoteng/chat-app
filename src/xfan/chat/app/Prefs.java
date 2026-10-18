@@ -60,6 +60,27 @@ public class Prefs {
     public static String namecolor() { return get("namecolor", "default"); }
     public static void namecolor(String v) { put("namecolor", v); }
 
+    /** 个性化数据缓存：避免每次打开侧边栏都重新拉取 */
+    public static String stylesJson() { return get("styles_json", ""); }
+    public static void stylesJson(String v) { put("styles_json", v); }
+
+    /** 个性化数据缓存时间（毫秒） */
+    public static long stylesTs() {
+        try { return Long.parseLong(get("styles_ts", "0")); } catch (Exception e) { return 0L; }
+    }
+    public static void stylesTs(long v) { put("styles_ts", String.valueOf(v)); }
+
+    /** 手动兑换/购买个性化后调用：下一侧边栏强制刷新 */
+    public static void invalidateStyles() { put("styles_ts", "0"); }
+
+    /** 会话免打扰：接收消息但不发通知。key = mute_<会话标识> */
+    public static boolean muted(String target) {
+        return "1".equals(get("mute_" + target, "0"));
+    }
+    public static void muted(String target, boolean on) {
+        put("mute_" + target, on ? "1" : "0");
+    }
+
     public static void clearSession() {
         put("token", "");
         put("pass", "");

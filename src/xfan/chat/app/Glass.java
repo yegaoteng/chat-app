@@ -169,6 +169,32 @@ public class Glass {
     }
 
     /** 只换背景，不动重力/点击（容器用） */
+    /** Dock 底板：外阴影 + 亮边 + 圆角轮廓，让玻璃条从背景里浮出来 */
+    public static void dock(View v, float radiusDp) {
+        if (v == null) return;
+        try {
+            final float r = dp(v.getContext(), radiusDp);
+            android.graphics.drawable.GradientDrawable gd =
+                    new android.graphics.drawable.GradientDrawable();
+            gd.setCornerRadius(r);
+            gd.setColor(0xD91B1B28);
+            gd.setStroke(1, 0x66FFFFFF);
+            v.setBackgroundDrawable(gd);
+            if (android.os.Build.VERSION.SDK_INT >= 21) {
+                try {
+                    v.setElevation(dp(v.getContext(), 12));
+                    v.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                        @Override
+                        public void getOutline(View view, android.graphics.Outline o) {
+                            o.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
+                        }
+                    });
+                    v.setClipToOutline(true);
+                } catch (Throwable ignore) {}
+            }
+        } catch (Throwable ignore) {}
+    }
+
     public static GlassDrawable background(View v, boolean selected, float radiusDp) {
         if (v == null) return null;
         GlassDrawable d = new GlassDrawable(dp(v == null ? null : v.getContext(), radiusDp), selected);

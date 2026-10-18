@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- 内置下载器：下载并发起安装 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 通知：后台新消息与版本更新提示（Android 13+ 需运行时授权） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -69,6 +72,10 @@
             android:theme="@style/FullscreenTheme" />
 
         <!-- 内置下载器用的文件提供者（零第三方依赖，不引入 androidx） -->
+        <service
+            android:name=".MonitorService"
+            android:exported="false" />
+
         <provider
             android:name=".ApkProvider"
             android:authorities="xfan.chat.app.apk"

@@ -89,6 +89,8 @@ public class MainActivity extends Activity {
     private static final int BLUE_ON   = 0xFF4EA3FF;
 
     public static MainActivity self;
+    /** 是否在前台：后台守护据此决定要不要发通知 */
+    public static boolean foreground = false;
 
     /** 内置样式目录：网络不通时个性化依然可切换 */
     private static JSONArray builtin(String kind) throws Exception {
@@ -190,6 +192,35 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        foreground = true;
+        // 每次回到前台都确认通知权限，没授权就申请
+        try { ensureNotifyPermission(); } catch (Throwable ignore) {}
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        foreground = false;
+    }
+
+    /**
+     * 通知权限：Android 13+ 必须显式授权。
+     * 未授权就什么也不做（保持关闭），不会反复骚扰。
+     */
+    public void ensureNotifyPermission() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return;
+        try {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 9001);
+            }
+        } catch (Throwable ignore) {}
+    }
+
+    @Override
     public void onBackPressed() {
         if (drawerOpen) { closeDrawer(); return; }
         super.onBackPressed();
@@ -199,7 +230,7 @@ public class MainActivity extends Activity {
     /** 底部 Dock：液态玻璃底板 + 深蓝选中层（可长按拖动切页） */
     private void setupDock() {
         View glass = findViewById(R.id.dockGlass);
-        if (glass != null) Glass.background(glass, false, 24f);
+        if (glass != null) Glass.dock(glass, 24f);
         dockIndicator = findViewById(R.id.dockIndicator);
         final View wrap = findViewById(R.id.dockWrap);
         if (wrap != null) {
@@ -474,8 +505,8 @@ public class MainActivity extends Activity {
                 }
             });
         } else {
-            // 带金币图标；pts 为 0 时也照样显示，不再空白
-            tvPoints.setText("💰 " + Math.max(0, pts) + " 分");
+            // 好友/我的页：只显示数字 + 「积分」，不要图标
+            tvPoints.setText(Math.max(0, pts) + " 积分");
             tvPoints.setOnClickListener(null);
         }
         tvPoints.setVisibility(View.VISIBLE);
@@ -572,23 +603,46 @@ public class MainActivity extends Activity {
         addRedeemSection();
         addAnnSection();
 
-        // 异步拉取真实目录（含解锁状态），拿到后只刷新个性化这三块
+        // 个性化目录走 24 小时缓存：每次开侧边栏都拉会很慢，
+        // 而且拿到之前会短暂显示「未兑换」，看着像状态错了。
+        String cached = Prefs.stylesJson();
+        boolean fresh = Prefs.stylesTs() > 0
+                && (System.currentTimeMillis() - Prefs.stylesTs() < 24L * 3600 * 1000);
+        if (!cached.isEmpty() && fresh) {
+            try { applyStyleJson(new JSONObject(cached)); } catch (Throwable ignore) {}
+            return;   // 缓存有效：本次只加载公告，不再请求目录
+        }
+
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=style_catalog");
                 ui(new Runnable() {
                     public void run() {
-                        if (r == null) return;
-                        JSONArray th = r.optJSONArray("themes");
-                        JSONArray bb = r.optJSONArray("bubbles");
-                        JSONArray nc = r.optJSONArray("namecolors");
-                        JSONObject mine = r.optJSONObject("mine");
-                        if (th == null && bb == null && nc == null) return;
-                        rebuildStyles(th, bb, nc, mine);
+                        if (r == null) {
+                            // 请求失败时退回旧缓存，至少不会显示空目录
+                            String old = Prefs.stylesJson();
+                            if (!old.isEmpty()) {
+                                try { applyStyleJson(new JSONObject(old)); } catch (Throwable ignore) {}
+                            }
+                            return;
+                        }
+                        Prefs.stylesJson(r.toString());
+                        Prefs.stylesTs(System.currentTimeMillis());
+                        applyStyleJson(r);
                     }
                 });
             }
         }).start();
+    }
+
+    /** 把目录 JSON 渲染进个性化区块 */
+    private void applyStyleJson(JSONObject r) {
+        JSONArray th = r.optJSONArray("themes");
+        JSONArray bb = r.optJSONArray("bubbles");
+        JSONArray nc = r.optJSONArray("namecolors");
+        JSONObject mine = r.optJSONObject("mine");
+        if (th == null && bb == null && nc == null) return;
+        rebuildStyles(th, bb, nc, mine);
     }
 
     /**
@@ -644,7 +698,8 @@ public class MainActivity extends Activity {
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
         final TextView btn = new TextView(this);
-        btn.setText("每日签到 (+50)");
+        // 已签到就显示「今日已签到」，不再让人误以为还能再点一次
+        btn.setText(Prefs.get("signed_today", "0").equals("1") ? "今日已签到" : "每日签到 (+50)");
         btn.setTextColor(WHITE_OFF);
         btn.setTextSize(15);
         btn.setPadding(18, 16, 18, 16);
@@ -677,8 +732,10 @@ public class MainActivity extends Activity {
                     public void run() {
                         pb.setVisibility(View.GONE);
                         btn.setEnabled(true);
-                        btn.setText("每日签到 (+50)");
-                        if (r == null) { toast("网络错误"); return; }
+                        if (r == null) { btn.setText("每日签到 (+50)"); toast("网络错误"); return; }
+                        btn.setText(r.optBoolean("success", false) ? "今日已签到"
+                                : "每日签到 (+50)");
+                        Prefs.put("signed_today", r.optBoolean("success", false) ? "1" : "0");
                         toast(r.optBoolean("success", false)
                                 ? ("签到成功 +" + r.optInt("reward", 50))
                                 : r.optString("error", "签到失败"));
@@ -845,6 +902,8 @@ public class MainActivity extends Activity {
                         // 立即生效，不等下次拉取资料
                         applyTheme();
                         toast("已切换");
+                        // 手动兑换/切换过，缓存作废，下次开侧边栏重新拉
+                        Prefs.invalidateStyles();
                         loadDrawer();
                         loadProfile();
                     }

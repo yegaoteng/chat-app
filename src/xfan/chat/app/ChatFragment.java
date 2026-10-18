@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -37,6 +38,7 @@ public class ChatFragment extends Fragment {
     private ListView lv;
     private EditText edMsg;
     private ViewGroup tvOnline;
+    private View chatBgBase = null;
     private ProgressBar pbSending;
     private View inputArea;
     private MsgAdapter ad;
@@ -59,6 +61,9 @@ public class ChatFragment extends Fragment {
     private static final int REQ_PICK_BG = 103;
     private ImageView ivChatBg;
 
+    /** 最近一次长按的坐标，供菜单定位 */
+    private float lastTouchX = 0f, lastTouchY = 0f;
+
     /** 当前正在引用的消息 */
     private Models.Msg quoting = null;
     private View quoteBar;
@@ -72,6 +77,7 @@ public class ChatFragment extends Fragment {
         edMsg = v.findViewById(R.id.edMsg);
         tvOnline = v.findViewById(R.id.tvOnline);
         ivChatBg = v.findViewById(R.id.ivChatBg);
+        chatBgBase = v.findViewById(R.id.chatBgBase);
         pbSending = v.findViewById(R.id.pbSending);
         inputArea = v.findViewById(R.id.inputArea);
         loadingBar = v.findViewById(R.id.loadingBar);
@@ -113,6 +119,13 @@ public class ChatFragment extends Fragment {
             public void onClick(View v2) { showUploads(); }
         });
 
+        lv.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View vv, MotionEvent ev) {
+                lastTouchX = ev.getX();
+                lastTouchY = ev.getY();
+                return false;
+            }
+        });
         lv.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             public boolean onItemLongClick(AdapterView<?> p, View v2, int pos, long id) {
                 if (pos < 0 || pos >= data.size()) return true;
@@ -645,7 +658,11 @@ public class ChatFragment extends Fragment {
                     public void run() {
                         if (ivChatBg == null) return;
                         String u = (r == null) ? "" : r.optString("url", "");
-                        if (u.isEmpty()) { ivChatBg.setVisibility(View.GONE); return; }
+                        if (u.isEmpty()) {
+                            ivChatBg.setVisibility(View.GONE);
+                            if (chatBgBase != null) chatBgBase.setVisibility(View.GONE);
+                            return;
+                        }
 
                         // 版本号：服务器换了新背景 v 就会变，URL 跟着变，
                         // 于是自然绕过图片缓存；没换时 URL 稳定，仍走 24 小时缓存。
@@ -655,6 +672,9 @@ public class ChatFragment extends Fragment {
 
                         // 应用锁竖屏，背景统一裁切铺满即可
                         ivChatBg.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        // 底板先铺一层中性色：金色主题的窗口渐变是黄的，
+                        // 不隔开会直接透上来把壁纸染黄。
+                        if (chatBgBase != null) chatBgBase.setVisibility(View.VISIBLE);
                         ivChatBg.setVisibility(View.VISIBLE);
                         ivChatBg.setTag(full);
                         new ImgLoader(ivChatBg).load(full, 1080, 1920);
@@ -686,6 +706,7 @@ public class ChatFragment extends Fragment {
                     public void run() {
                         if (r == null) { toast("设置失败（可能是服务器拦截了上传）"); return; }
                         if (!r.optBoolean("success", false)) {
+                            // 超限等提示走底部消息条，不打断操作
                             toast(r.optString("error", "设置失败"));
                             return;
                         }
@@ -917,11 +938,22 @@ public class ChatFragment extends Fragment {
         acts.add("引用");
         acts.add("复制");
 
-        new AlertDialog.Builder(getActivity())
-                .setTitle(mine ? "我的消息" : m.username)
-                .setItems(acts.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        String a = acts.get(w);
+        // 菜单贴在长按位置下方（下方没空间就翻上方），不再居中弹窗 + 灰遮罩
+        View anchor = (lv != null) ? lv : getActivity().findViewById(android.R.id.content);
+        final String target = bgTarget();
+        MsgMenu.show(getActivity(), anchor, lastTouchX, lastTouchY, acts,
+                Prefs.muted(target), new MsgMenu.Callback() {
+                    public void onAction(String a) {
+                        if ("__mute_on".equals(a)) {
+                            Prefs.muted(target, true);
+                            toast("已开启免打扰（仍会接收，但不再通知）");
+                            return;
+                        }
+                        if ("__mute_off".equals(a)) {
+                            Prefs.muted(target, false);
+                            toast("已关闭免打扰");
+                            return;
+                        }
                         if ("复制".equals(a)) {
                             android.content.ClipboardManager cm =
                                     (android.content.ClipboardManager) getActivity()
@@ -934,7 +966,7 @@ public class ChatFragment extends Fragment {
                             doRecall(m);
                         }
                     }
-                }).show();
+                });
     }
 
     /** 设置引用目标，并在输入框上方显示可取消的引用条 */

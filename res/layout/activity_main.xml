@@ -87,7 +87,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
 
-            <!-- 当前选择层：跟随选中项滑动 -->
+            <!-- 当前选择层：半透明浅蓝，跟随选中项滑动（在文字下层） -->
             <View
                 android:id="@+id/dockIndicator"
                 android:layout_width="0dp"
@@ -101,11 +101,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@null"
-                android:orientation="horizontal"
-                android:paddingLeft="6dp"
-                android:paddingRight="6dp">
+                android:orientation="horizontal">
 
-                <!-- 图2 风格：图标在上、文字在下 -->
                 <LinearLayout
                     android:id="@+id/tabChat"
                     android:layout_width="0dp"
@@ -116,9 +113,11 @@
 
                     <ImageView
                         android:id="@+id/icChat"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:adjustViewBounds="true"
                         android:contentDescription="@string/tab_chat"
+                        android:scaleType="fitCenter"
                         android:src="@drawable/ic_tab_chat" />
 
                     <TextView
@@ -140,12 +139,30 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
-                    <ImageView
-                        android:id="@+id/icFriends"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:contentDescription="@string/tab_friends"
-                        android:src="@drawable/ic_tab_friends" />
+                    <!-- 双人：两个圆点横排，避免用 layer-list 的 width 属性（低版本不生效） -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="22dp"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:id="@+id/icFriends"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:adjustViewBounds="true"
+                            android:contentDescription="@string/tab_friends"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_tab_dot" />
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginLeft="-3dp"
+                            android:adjustViewBounds="true"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_tab_dot" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvFriends"
@@ -167,9 +184,11 @@
 
                     <ImageView
                         android:id="@+id/icMe"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:adjustViewBounds="true"
                         android:contentDescription="@string/tab_me"
+                        android:scaleType="fitCenter"
                         android:src="@drawable/ic_tab_me" />
 
                     <TextView
