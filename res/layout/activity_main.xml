@@ -34,7 +34,9 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:gravity="center"
+                android:maxLines="1"
                 android:text="@string/app_name"
                 android:textColor="@color/text_light"
                 android:textSize="17sp"
@@ -45,14 +47,22 @@
                 android:id="@+id/tvPoints"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginLeft="4dp"
+                android:layout_weight="0"
                 android:background="@drawable/bg_top_chip"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxLines="1"
+                android:minWidth="52dp"
                 android:paddingLeft="10dp"
                 android:paddingTop="5dp"
                 android:paddingRight="10dp"
                 android:paddingBottom="5dp"
+                android:text="0 分"
                 android:textColor="#FFD75E"
                 android:textSize="12sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="visible" />
         </LinearLayout>
 
         <FrameLayout
@@ -91,38 +101,86 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@null"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingLeft="6dp"
+                android:paddingRight="6dp">
 
-                <TextView
+                <!-- 图2 风格：图标在上、文字在下 -->
+                <LinearLayout
                     android:id="@+id/tabChat"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:gravity="center"
-                    android:text="@string/tab_chat"
-                    android:textColor="@color/accent"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:orientation="vertical">
 
-                <TextView
+                    <ImageView
+                        android:id="@+id/icChat"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@string/tab_chat"
+                        android:src="@drawable/ic_tab_chat" />
+
+                    <TextView
+                        android:id="@+id/tvChat"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/tab_chat"
+                        android:textColor="@color/accent"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/tabFriends"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:gravity="center"
-                    android:text="@string/tab_friends"
-                    android:textColor="@color/text_sub"
-                    android:textSize="14sp" />
+                    android:orientation="vertical">
 
-                <TextView
+                    <ImageView
+                        android:id="@+id/icFriends"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@string/tab_friends"
+                        android:src="@drawable/ic_tab_friends" />
+
+                    <TextView
+                        android:id="@+id/tvFriends"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/tab_friends"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/tabMe"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:gravity="center"
-                    android:text="@string/tab_me"
-                    android:textColor="@color/text_sub"
-                    android:textSize="14sp" />
+                    android:orientation="vertical">
+
+                    <ImageView
+                        android:id="@+id/icMe"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@string/tab_me"
+                        android:src="@drawable/ic_tab_me" />
+
+                    <TextView
+                        android:id="@+id/tvMe"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/tab_me"
+                        android:textColor="@color/text_sub"
+                        android:textSize="11sp" />
+                </LinearLayout>
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>

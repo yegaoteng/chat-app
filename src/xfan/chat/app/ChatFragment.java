@@ -36,7 +36,7 @@ public class ChatFragment extends Fragment {
     public MainActivity host;
     private ListView lv;
     private EditText edMsg;
-    private TextView tvOnline;
+    private ViewGroup tvOnline;
     private ProgressBar pbSending;
     private View inputArea;
     private MsgAdapter ad;
@@ -147,10 +147,10 @@ public class ChatFragment extends Fragment {
     public void applyTheme() {
         if (inputArea == null) return;
         try {
-            inputArea.setBackgroundColor(ThemeEngine.themePanel());
+            // 输入区保持透明，让聊天背景透出来（之前整块盖色，壁纸被挡住一截）
+            inputArea.setBackgroundColor(0x00000000);
             if (tvOnline != null) {
                 tvOnline.setBackgroundColor(ThemeEngine.themePanel());
-                tvOnline.setTextColor(ThemeEngine.themeTextSub());
             }
             if (edMsg != null) edMsg.setTextColor(ThemeEngine.themeText());
             if (ad != null) ad.notifyDataSetChanged();
@@ -398,43 +398,46 @@ public class ChatFragment extends Fragment {
                             }
                         }
 
-                        String prefix = "在线 " + arr.length() + "：";
-                        StringBuilder sb = new StringBuilder(prefix);
-                        // 记录每个人名在拼接串里的起止位置，后面按段上色
-                        java.util.List<int[]> spans = new java.util.ArrayList<int[]>();
-                        for (int i = 0; i < arr.length() && i < 8; i++) {
-                            String nm = arr.optString(i, "");
-                            int st = sb.length();
-                            sb.append(nm);
-                            spans.add(new int[]{st, sb.length()});
-                            if (i < arr.length() - 1 && i < 7) sb.append("、");
-                        }
-                        if (tvOnline != null) {
-                            android.text.SpannableString sp =
-                                    new android.text.SpannableString(sb.toString());
-                            // 「在线 N」用绿色
-                            sp.setSpan(new android.text.style.ForegroundColorSpan(0xFF2E7D32),
-                                    0, prefix.length(),
-                                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                            // 每个人名用它自己的名称颜色
-                            for (int i = 0; i < spans.size(); i++) {
-                                int[] rg = spans.get(i);
-                                String nm = arr.optString(i, "");
-                                String key = cmap.containsKey(nm) ? cmap.get(nm) : "default";
-                                int col = ThemeEngine.namePlainColorFor(key);
-                                if ("rainbow_static".equals(key) || "rainbow_dynamic".equals(key)) {
-                                    col = ThemeEngine.rainbowColor(i);
-                                }
-                                sp.setSpan(new android.text.style.ForegroundColorSpan(col),
-                                        rg[0], rg[1],
-                                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                            }
-                            tvOnline.setText(sp);
-                        }
+                        renderOnline(arr, cmap);
                     }
                 });
             }
         }).start();
+    }
+
+    /**
+     * 在线条：每个用户一个独立 TextView。
+     * 之前整条用一个 SpannableString，彩虹只能取静态单色、也没法流动；
+     * 拆成独立 View 后，各自的 namecolor（含动态七彩）才能生效。
+     */
+    private void renderOnline(JSONArray arr, java.util.Map<String, String> cmap) {
+        if (tvOnline == null) return;
+        try {
+            tvOnline.removeAllViews();
+            android.content.Context ctx = getActivity();
+            if (ctx == null) return;
+
+            TextView head = new TextView(ctx);
+            head.setText("在线 " + arr.length() + "：");
+            head.setTextColor(0xFF2E7D32);   // 「在线 N」绿色
+            head.setTextSize(11);
+            head.setSingleLine(true);
+            tvOnline.addView(head);
+
+            int n = Math.min(arr.length(), 8);
+            for (int i = 0; i < n; i++) {
+                String nm = arr.optString(i, "");
+                if (nm.isEmpty()) continue;
+                TextView t = new TextView(ctx);
+                t.setText(nm + (i < n - 1 ? "、" : ""));
+                t.setTextSize(11);
+                t.setSingleLine(true);
+                String key = (cmap != null && cmap.containsKey(nm)) ? cmap.get(nm) : "default";
+                // 传对方自己的 key：dynamic 才会流动
+                ThemeEngine.applyNameColorFor(t, key);
+                tvOnline.addView(t);
+            }
+        } catch (Throwable ignore) {}
     }
 
     // ---------- 发送 ----------
@@ -650,19 +653,11 @@ public class ChatFragment extends Fragment {
                         String full = Api.absUrl(u);
                         if (v > 0) full += (full.contains("?") ? "&" : "?") + "v=" + v;
 
-                        // 横屏：完整显示并居中（竖屏才裁切铺满）
-                        boolean land = false;
-                        try {
-                            land = getResources().getConfiguration().orientation
-                                    == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-                        } catch (Throwable ignore) {}
-                        ivChatBg.setScaleType(land
-                                ? ImageView.ScaleType.FIT_CENTER
-                                : ImageView.ScaleType.CENTER_CROP);
-
+                        // 应用锁竖屏，背景统一裁切铺满即可
+                        ivChatBg.setScaleType(ImageView.ScaleType.CENTER_CROP);
                         ivChatBg.setVisibility(View.VISIBLE);
                         ivChatBg.setTag(full);
-                        new ImgLoader(ivChatBg).load(full, land ? 1920 : 1080, land ? 1080 : 1920);
+                        new ImgLoader(ivChatBg).load(full, 1080, 1920);
                     }
                 });
             }

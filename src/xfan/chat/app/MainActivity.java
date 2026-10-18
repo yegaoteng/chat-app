@@ -16,6 +16,7 @@ import android.view.animation.AnimationUtils;
 import android.view.animation.ScaleAnimation;
 import android.view.animation.TranslateAnimation;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -31,7 +32,10 @@ public class MainActivity extends Activity {
 
     private FrameLayout drawerRoot;
     private LinearLayout drawerPanel, drawerBody;
-    private TextView tvTitle, tvPoints, tabChat, tabFriends, tabMe;
+    private TextView tvTitle, tvPoints;
+    private View tabChat, tabFriends, tabMe;
+    private TextView tvChat, tvFriends, tvMe;
+    private ImageView icChat, icFriends, icMe;
     private View dockIndicator;
     private boolean drawerOpen = false;
 
@@ -39,6 +43,43 @@ public class MainActivity extends Activity {
     public FriendsFragment fFriends;
     public MeFragment fMe;
     private int curTab = 0;   // 0 聊天 1 好友 2 我的
+
+    /**
+     * 兜底：确保同一时刻只有一个页面的视图可见。
+     * 现象：切到好友/我的后，聊天页的输入栏偶尔还留在下面。
+     */
+    private void enforceOnly(int t) {
+        Fragment[] fs = {fChat, fFriends, fMe};
+        for (int i = 0; i < fs.length; i++) {
+            Fragment x = fs[i];
+            if (x == null || x.getView() == null) continue;
+            try {
+                x.getView().setVisibility(i == t ? View.VISIBLE : View.GONE);
+            } catch (Throwable ignore) {}
+        }
+    }
+
+    /** 选中项文字与图标一起点亮（图2 风格：白图标 + 亮蓝字） */
+    private void syncDockColors() {
+        int on = getResources().getColor(R.color.accent);
+        int off = getResources().getColor(R.color.text_sub);
+        TextView[] tvs = {tvChat, tvFriends, tvMe};
+        ImageView[] ics = {icChat, icFriends, icMe};
+        for (int i = 0; i < 3; i++) {
+            boolean sel = (i == curTab);
+            if (tvs[i] != null) {
+                tvs[i].setTextColor(sel ? on : off);
+                tvs[i].setTypeface(null, sel ? android.graphics.Typeface.BOLD
+                        : android.graphics.Typeface.NORMAL);
+            }
+            if (ics[i] != null) {
+                try {
+                    ics[i].setColorFilter(sel ? on : off,
+                            android.graphics.PorterDuff.Mode.SRC_IN);
+                } catch (Throwable ignore) {}
+            }
+        }
+    }
 
     /** Dock 拖拽用的主线程 Handler（长按判定 + 指示层移动） */
     private final Handler dockH = new Handler(Looper.getMainLooper());
@@ -87,6 +128,12 @@ public class MainActivity extends Activity {
         tabChat     = findViewById(R.id.tabChat);
         tabFriends  = findViewById(R.id.tabFriends);
         tabMe       = findViewById(R.id.tabMe);
+        tvChat      = findViewById(R.id.tvChat);
+        tvFriends   = findViewById(R.id.tvFriends);
+        tvMe        = findViewById(R.id.tvMe);
+        icChat      = findViewById(R.id.icChat);
+        icFriends   = findViewById(R.id.icFriends);
+        icMe        = findViewById(R.id.icMe);
 
         // 先用本地缓存把右上角填上，别等网络回来才出现（否则看着像缺了一块 UI）
         syncTopRight(Prefs.points());
@@ -316,6 +363,9 @@ public class MainActivity extends Activity {
             if (fMe.isAdded()) ft.hide(fMe);
             ft.show(f);
             ft.commit();
+            // 关键：commit 是异步的。不立刻执行的话，
+            // 快速连点或在 fragment 尚未添加时切换，旧页面（含聊天输入栏）会残留可见。
+            getFragmentManager().executePendingTransactions();
         } catch (Throwable e) {
             Log.w("XFAN", "fragment 切换失败，降级重来", e);
             try {
@@ -323,14 +373,13 @@ public class MainActivity extends Activity {
                 if (!f.isAdded()) ft2.add(R.id.content, f, "tab" + t);
                 ft2.show(f);
                 ft2.commitAllowingStateLoss();
+                getFragmentManager().executePendingTransactions();
             } catch (Throwable ignore) {}
         }
+        // 双保险：直接按可见性兜底，hide 万一没生效也不会露出聊天输入栏
+        enforceOnly(t);
 
-        int on = getResources().getColor(R.color.accent);
-        int off = getResources().getColor(R.color.text_sub);
-        tabChat.setTextColor(t == 0 ? on : off);
-        tabFriends.setTextColor(t == 1 ? on : off);
-        tabMe.setTextColor(t == 2 ? on : off);
+        syncDockColors();
         popTab(t == 0 ? tabChat : (t == 1 ? tabFriends : tabMe));
 
         tvTitle.setText(t == 0 ? getString(R.string.tab_chat)

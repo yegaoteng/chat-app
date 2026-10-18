@@ -97,6 +97,7 @@ public class MsgAdapter extends BaseAdapter {
 
         // ---- 气泡：用服务端回填的发送者样式，别人也能看到个性化 ----
         String bKey = (m.bubble == null || m.bubble.isEmpty()) ? "default" : m.bubble;
+        ThemeEngine.unregisterBubble(vh.body);   // 先摘掉复用行上旧的动画目标
         vh.body.setBackgroundDrawable(ThemeEngine.bubbleFor(bKey, self));
         vh.body.setTextColor(ThemeEngine.bubbleTextFor(bKey, self));
 

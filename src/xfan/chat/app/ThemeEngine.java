@@ -1,9 +1,16 @@
 package xfan.chat.app;
 
 import android.app.Activity;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
 import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.os.Handler;
@@ -77,9 +84,15 @@ public class ThemeEngine {
             View top = a.findViewById(R.id.topBar);
             if (top != null) top.setBackgroundDrawable(bd);
 
-            // 底部标签栏
+            // 底部 Dock：只给玻璃底板染色，不整块盖死。
+            // 之前直接给 bottomBar 设不透明渐变，金色主题下会把壁纸和玻璃都糊掉。
             View bot = a.findViewById(R.id.bottomBar);
-            if (bot != null) bot.setBackgroundDrawable(bd);
+            if (bot != null) bot.setBackgroundDrawable(null);
+            View glass = a.findViewById(R.id.dockGlass);
+            if (glass != null) {
+                Glass.background(glass, false, 24f);
+                try { glass.getOverlay().clear(); } catch (Throwable ignore) {}
+            }
 
             // 侧边栏保持青字（用户明确要求），仅换背景
             View panel = a.findViewById(R.id.drawerPanel);
@@ -120,15 +133,10 @@ public class ThemeEngine {
             return gd;
         }
         if ("rainbow".equals(k)) {
-            // 七色流彩：七彩边框
-            int[] c = self
-                    ? new int[]{0x33FF0080, 0x33FF8C00}
-                    : new int[]{0x22FFFFFF, 0x22EEEEEE};
-            gd = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, c);
-            gd.setCornerRadius(14);
-            // 用叠加边框模拟七彩（原生只能单色描边，这里取彩虹主色）
-            gd.setStroke(3, rainbowColor(0));
-            return gd;
+            // 七色流彩：真正流动的七彩描边（不是静态单色）
+            RainbowDrawable rd = new RainbowDrawable(self);
+            RainbowAnimator.register(rd);
+            return rd;
         }
         // default：跟随主题。加一圈描边，保证在主题背景上依然「浮」出来
         int fill = self ? (isGold() ? 0xFFC8901E : 0xFF667EEA)
@@ -193,7 +201,7 @@ public class ThemeEngine {
         if (tv == null) return;
         String k = (key == null || key.isEmpty()) ? "default" : key;
         if ("rainbow_static".equals(k) || "rainbow_dynamic".equals(k)) {
-            applyRainbow(tv);
+            applyRainbow(tv, k);
         } else {
             tv.getPaint().setShader(null);
             tv.setTextColor(namePlainColorFor(k));
@@ -201,13 +209,18 @@ public class ThemeEngine {
         }
     }
 
-    private static void applyRainbow(TextView tv) {
+    /**
+     * 给 TextView 上彩虹字。
+     * 关键：是否流动要看「这个人自己的」key，不是看我的 ——
+     * 之前误用 nameKey()（我自己的设置），导致别人看我时永远是静态的。
+     */
+    private static void applyRainbow(TextView tv, String key) {
         float w = tv.getWidth();
         if (w <= 0) w = 120f;
         Shader sh = new LinearGradient(0, 0, w, 0, RAINBOW, null, Shader.TileMode.MIRROR);
         tv.getPaint().setShader(sh);
         tv.setTextColor(0xFF222222);   // 底字，被 shader 覆盖
-        if ("rainbow_dynamic".equals(nameKey())) RainbowAnimator.register(tv);
+        if ("rainbow_dynamic".equals(key)) RainbowAnimator.register(tv);
         else RainbowAnimator.unregister(tv);
     }
 
@@ -215,17 +228,77 @@ public class ThemeEngine {
      * 动态七彩：定时平移 shader 矩阵产生流动效果。
      * 只维护少量已注册的 TextView，避免列表滚动时堆积。
      */
+    /**
+     * 七色流彩气泡：填充 + 会流动的七彩描边。
+     * 原生 GradientDrawable 只能单色描边，所以自己画。
+     */
+    public static class RainbowDrawable extends Drawable {
+        private final boolean self;
+        private final Paint fillP = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint strokeP = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF rc = new RectF();
+        private float off = 0f;
+        private float radius = 14f;
+        private int w = 0, h = 0;
+
+        public RainbowDrawable(boolean self) {
+            this.self = self;
+            fillP.setStyle(Paint.Style.FILL);
+            strokeP.setStyle(Paint.Style.STROKE);
+            strokeP.setStrokeWidth(3f);
+        }
+
+        @Override
+        protected void onBoundsChange(Rect b) {
+            w = b.width(); h = b.height();
+        }
+
+        /** 由动画器驱动：偏移变化后重绘，描边就流动起来 */
+        public void setOffset(float o) { off = o; }
+
+        public float getOffset() { return off; }
+
+        @Override
+        public void draw(Canvas c) {
+            Rect b = getBounds();
+            if (b.width() <= 0 || b.height() <= 0) return;
+            rc.set(b.left + 1.5f, b.top + 1.5f, b.right - 1.5f, b.bottom - 1.5f);
+
+            // 填充：自己的更明显，别人的淡一点（不抢文字）
+            float wf = rc.width();
+            fillP.setShader(new LinearGradient(0, rc.top, 0, rc.bottom,
+                    self ? 0x55FF0080 : 0x33FFFFFF,
+                    self ? 0x5500C7BE : 0x33F2F2F2,
+                    Shader.TileMode.CLAMP));
+            c.drawRoundRect(rc, radius, radius, fillP);
+
+            // 七彩描边：渐变整体平移，视觉上就是流彩
+            float span = Math.max(wf, 120f);
+            strokeP.setShader(new LinearGradient(rc.left + off, rc.top,
+                    rc.left + off + span, rc.bottom, RAINBOW, null, Shader.TileMode.MIRROR));
+            c.drawRoundRect(rc, radius, radius, strokeP);
+            fillP.setShader(null);
+            strokeP.setShader(null);
+        }
+
+        @Override public void setAlpha(int a) {}
+        @Override public void setColorFilter(ColorFilter cf) {}
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
     private static class RainbowAnimator {
         // 同样必须绑主线程 Looper：RainbowAnimator 是内部类，
         // 若在子线程被首次加载，裸 new Handler() 会直接抛异常导致闪退。
         private static final Handler h = new Handler(android.os.Looper.getMainLooper());
         private static final List<TextView> views = new ArrayList<TextView>();
+        private static final List<RainbowDrawable> draws = new ArrayList<RainbowDrawable>();
         private static boolean running = false;
         private static float off = 0f;
 
         private static final Runnable tick = new Runnable() {
             public void run() {
                 off += 6f;
+                if (off > 100000f) off = 0f;   // 长时间挂着也不会溢出
                 for (int i = views.size() - 1; i >= 0; i--) {
                     TextView tv = views.get(i);
                     try {
@@ -237,24 +310,52 @@ public class ThemeEngine {
                         tv.invalidate();
                     } catch (Exception ignore) {}
                 }
+                // 气泡描边同步流动
+                for (int i = draws.size() - 1; i >= 0; i--) {
+                    RainbowDrawable d = draws.get(i);
+                    try {
+                        d.setOffset(off);
+                        d.invalidateSelf();
+                    } catch (Exception ignore) {}
+                }
                 if (running) h.postDelayed(this, 60);
             }
         };
 
         static void register(TextView tv) {
             if (!views.contains(tv)) views.add(tv);
-            if (!running) { running = true; h.postDelayed(tick, 60); }
+            start();
+        }
+
+        static void register(RainbowDrawable d) {
+            if (!draws.contains(d)) draws.add(d);
+            start();
         }
 
         static void unregister(TextView tv) {
             views.remove(tv);
         }
+
+        private static void start() {
+            if (!running) { running = true; h.postDelayed(tick, 60); }
+        }
     }
 
     /** 列表刷新前清理已失效的动画目标，防止内存泄漏 */
+    /** 列表行复用：把该 View 上旧的彩虹气泡从动画队列里摘掉，避免越堆越多 */
+    public static void unregisterBubble(View v) {
+        if (v == null || v.getBackground() instanceof RainbowDrawable) {
+            RainbowAnimator.draws.remove(v == null ? null : v.getBackground());
+        }
+    }
+
     public static void trimRainbow(int max) {
         while (RainbowAnimator.views.size() > max) {
             RainbowAnimator.views.remove(RainbowAnimator.views.size() - 1);
+        }
+        // 气泡 drawable 也要清，ListView 复用会不断产生新的
+        while (RainbowAnimator.draws.size() > max) {
+            RainbowAnimator.draws.remove(RainbowAnimator.draws.size() - 1);
         }
     }
 
