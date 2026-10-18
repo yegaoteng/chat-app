@@ -35,6 +35,15 @@ public class MsgMenu {
      */
     public static void show(Context ctx, View anchor, float x, float y,
                             List<String> acts, boolean muted, final Callback cb) {
+        show(ctx, anchor, x, y, acts, muted, true, cb);
+    }
+
+    /**
+     * @param showMute 是否显示免打扰开关。消息栏长按传 false。
+     */
+    public static void show(Context ctx, View anchor, float x, float y,
+                            List<String> acts, boolean muted, boolean showMute,
+                            final Callback cb) {
         if (ctx == null || anchor == null) return;
 
         LinearLayout box = new LinearLayout(ctx);
@@ -48,22 +57,24 @@ public class MsgMenu {
         gd.setStroke(2, 0x99FFFFFF);
         box.setBackgroundDrawable(gd);
 
-        // 免打扰开关：接收消息，但不在通知中心弹
-        final Switch sw = new Switch(ctx);
-        sw.setText("免打扰");
-        sw.setTextColor(0xFFFFFFFF);
-        sw.setChecked(muted);
-        sw.setPadding(pad, pad, pad, pad);
-        sw.setBackgroundDrawable(Ui.border(0x33FFFFFF, 0x99FFFFFF, Ui.R));
-        sw.setOnCheckedChangeListener(
-                new android.widget.CompoundButton.OnCheckedChangeListener() {
-                    public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
-                        if (cb != null) cb.onAction(on ? "__mute_on" : "__mute_off");
-                    }
-                });
-        box.addView(sw, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        // 免打扰开关：接收消息，但不在通知中心弹（仅好友 / 频道页显示）
+        if (showMute) {
+            final Switch sw = new Switch(ctx);
+            sw.setText("免打扰");
+            sw.setTextColor(0xFFFFFFFF);
+            sw.setChecked(muted);
+            sw.setPadding(pad, pad, pad, pad);
+            sw.setBackgroundDrawable(Ui.border(0x33FFFFFF, 0x99FFFFFF, Ui.R));
+            sw.setOnCheckedChangeListener(
+                    new android.widget.CompoundButton.OnCheckedChangeListener() {
+                        public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                            if (cb != null) cb.onAction(on ? "__mute_on" : "__mute_off");
+                        }
+                    });
+            box.addView(sw, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
 
         for (int i = 0; i < acts.size(); i++) {
             final String a = acts.get(i);

@@ -2,30 +2,39 @@ package xfan.chat.app;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.PointF;
 import android.os.Bundle;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
-/** 全屏图片预览 */
+/** 全屏图片预览：支持双指缩放、拖动，点一下关闭 */
 public class ImageViewActivity extends Activity {
+
+    private ImageView iv;
+    private final Matrix mx = new Matrix();
+    private final Matrix saved = new Matrix();
+    private static final int NONE = 0, DRAG = 1, ZOOM = 2;
+    private int mode = NONE;
+    private final PointF start = new PointF();
+    private final PointF mid = new PointF();
+    private float oldDist = 1f;
+    private float scale = 1f;
+    private boolean loaded = false;
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         final String url = getIntent().getStringExtra("url");
 
-        ImageView iv = new ImageView(this);
+        iv = new ImageView(this);
         iv.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT));
-        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        iv.setScaleType(ImageView.ScaleType.MATRIX);
         iv.setBackgroundColor(0xFF000000);
 
         LinearLayout root = new LinearLayout(this);
@@ -33,32 +42,135 @@ public class ImageViewActivity extends Activity {
         root.addView(iv);
         setContentView(root);
 
-        iv.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { finish(); }
+        // 单击关闭：未拖动过才算单击，避免缩放时误关
+        iv.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getAction() & MotionEvent.ACTION_MASK) {
+                    case MotionEvent.ACTION_DOWN:
+                        saved.set(mx);
+                        start.set(e.getX(), e.getY());
+                        mode = DRAG;
+                        break;
+                    case MotionEvent.ACTION_POINTER_DOWN:
+                        oldDist = spacing(e);
+                        if (oldDist > 10f) {
+                            saved.set(mx);
+                            midPoint(mid, e);
+                            mode = ZOOM;
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_POINTER_UP:
+                        if (mode == DRAG && spacing(e) < 1f
+                                && moved(start, e) < 10f && !zoomed()) {
+                            finish();
+                        }
+                        mode = NONE;
+                        break;
+                    case MotionEvent.ACTION_MOVE:
+                        if (mode == DRAG) {
+                            mx.set(saved);
+                            mx.postTranslate(e.getX() - start.x, e.getY() - start.y);
+                        } else if (mode == ZOOM && e.getPointerCount() >= 2) {
+                            float nd = spacing(e);
+                            if (nd > 10f) {
+                                mx.set(saved);
+                                float s = nd / oldDist;
+                                scale = Math.min(Math.max(scale * s, 0.5f), 8f);
+                                mx.postScale(s, s, mid.x, mid.y);
+                            }
+                        }
+                        break;
+                }
+                if (loaded) iv.setImageMatrix(mx);
+                return true;
+            }
         });
 
-        if (url == null || url.isEmpty()) { Toast.makeText(this, "地址为空", Toast.LENGTH_SHORT).show(); return; }
+        if (url == null || url.isEmpty()) {
+            Toast.makeText(this, "地址为空", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        final int want = screen() * 2;   // 2 倍短边：放大后细节足够，不会糊
+        // 原图解码上限：按屏幕短边的 2.5 倍，放大后细节够用，
+        // 且不会影响列表里那张缩略图（缓存按尺寸分桶）。
+        final int want = (int) (screen() * 2.5f);
+        Toast.makeText(this, "加载中…", Toast.LENGTH_SHORT).show();
 
         new Thread(new Runnable() {
             public void run() {
                 try {
-                    // 走 ImgLoader：带浏览器头与验证 cookie，否则会被 WAF 拦下
                     final Bitmap bm = ImgLoader.fetch(url, want, want);
                     if (bm == null) throw new Exception("null");
                     runOnUiThread(new Runnable() {
-                        public void run() { iv.setImageBitmap(bm); }
+                        public void run() {
+                            loaded = true;
+                            iv.setImageBitmap(bm);
+                            fit(bm);
+                        }
                     });
                 } catch (Exception e) {
                     runOnUiThread(new Runnable() {
                         public void run() {
-                            Toast.makeText(ImageViewActivity.this, "加载失败", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ImageViewActivity.this, "加载失败",
+                                    Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
             }
         }).start();
+    }
+
+    /** 初始居中并按比例缩放到屏幕内 */
+    private void fit(Bitmap bm) {
+        if (bm == null) return;
+        int vw = iv.getWidth(), vh = iv.getHeight();
+        float bw = bm.getWidth(), bh = bm.getHeight();
+        if (vw <= 0 || vh <= 0) {
+            iv.post(new Runnable() {
+                public void run() { fit2(); }
+            });
+            return;
+        }
+        fit2();
+    }
+
+    private void fit2() {
+        android.graphics.drawable.Drawable d = iv.getDrawable();
+        if (d == null) return;
+        int vw = iv.getWidth(), vh = iv.getHeight();
+        float bw = d.getIntrinsicWidth(), bh = d.getIntrinsicHeight();
+        if (vw <= 0 || vh <= 0 || bw <= 0 || bh <= 0) return;
+        float s = Math.min(vw / bw, vh / bh);
+        s = Math.min(s, 3f);
+        mx.reset();
+        mx.postScale(s, s);
+        mx.postTranslate((vw - bw * s) / 2f, (vh - bh * s) / 2f);
+        scale = 1f;
+        iv.setImageMatrix(mx);
+    }
+
+    private boolean zoomed() {
+        float[] v = new float[9];
+        mx.getValues(v);
+        return Math.abs(v[Matrix.MSCALE_X] - 1f) > 0.01f;
+    }
+
+    private float spacing(MotionEvent e) {
+        if (e.getPointerCount() < 2) return 0f;
+        float x = e.getX(0) - e.getX(1);
+        float y = e.getY(0) - e.getY(1);
+        return (float) Math.sqrt(x * x + y * y);
+    }
+
+    private void midPoint(PointF p, MotionEvent e) {
+        if (e.getPointerCount() < 2) { p.set(e.getX(), e.getY()); return; }
+        p.set((e.getX(0) + e.getX(1)) / 2f, (e.getY(0) + e.getY(1)) / 2f);
+    }
+
+    private float moved(PointF s, MotionEvent e) {
+        float dx = e.getX() - s.x, dy = e.getY() - s.y;
+        return (float) Math.sqrt(dx * dx + dy * dy);
     }
 
     /** 取屏幕短边 */

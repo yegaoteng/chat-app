@@ -62,7 +62,7 @@ public class MainActivity extends Activity {
     /** 选中项文字与图标一起点亮（图2 风格：白图标 + 亮蓝字） */
     private void syncDockColors() {
         int on = getResources().getColor(R.color.accent);
-        int off = getResources().getColor(R.color.text_sub);
+        int off = 0xFF000000;   // 未选中用黑色，白底 Dock 上才看得清
         TextView[] tvs = {tvChat, tvFriends, tvMe};
         ImageView[] ics = {icChat, icFriends, icMe};
         for (int i = 0; i < 3; i++) {
@@ -203,6 +203,7 @@ public class MainActivity extends Activity {
         try {
             if (Prefs.get("notify_asked", "0").equals("0")) {
                 Prefs.put("notify_asked", "1");
+                // 仅首次进入 APP 弹一次系统授权框
                 ensureNotifyPermission();
             }
         } catch (Throwable ignore) {}
@@ -925,9 +926,17 @@ public class MainActivity extends Activity {
                         if (kind.equals("theme")) Prefs.theme(key);
                         else if (kind.equals("bubble")) Prefs.bubble(key);
                         else Prefs.namecolor(key);
-                        // 立即生效，不等下次拉取资料
+                        // 立即生效，不等下次拉取资料。
+                        // 聊天数据也要重画：气泡/名称色是服务端按发送者回填的，
+                        // 不重载的话列表里仍是旧样式，得手动刷新才看得到变化。
                         applyTheme();
                         toast("已切换");
+                        if (fChat != null) {
+                            try { fChat.reloadForStyleChange(); } catch (Throwable ignore) {}
+                        }
+                        if (fFriends != null) {
+                            try { fFriends.reloadForStyleChange(); } catch (Throwable ignore) {}
+                        }
                         // 手动兑换/切换过，缓存作废，下次开侧边栏重新拉
                         Prefs.invalidateStyles();
                         loadDrawer();

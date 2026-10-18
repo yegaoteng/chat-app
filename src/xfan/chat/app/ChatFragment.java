@@ -61,6 +61,20 @@ public class ChatFragment extends Fragment {
     private static final int REQ_PICK_BG = 103;
     private ImageView ivChatBg;
 
+    /** 个性化切换后调用：清空并重新拉取，让新气泡/名称色立刻可见 */
+    public void reloadForStyleChange() {
+        try {
+            lastTs = 0;
+            data.clear();
+            keys.clear();
+            if (ad != null) ad.notifyDataSetChanged();
+            loadHistory();
+        } catch (Throwable ignore) {}
+    }
+
+    /** 当前打开的「我的上传」弹窗，删除后可直接关掉重开 */
+    private AlertDialog uploadDlg = null;
+
     /** 最近一次长按的坐标，供菜单定位 */
     private float lastTouchX = 0f, lastTouchY = 0f;
 
@@ -845,11 +859,18 @@ public class ChatFragment extends Fragment {
                             box.addView(row);
                         }
                         sv.addView(box);
-                        new AlertDialog.Builder(getActivity())
-                                .setTitle("我的上传（点击发送）")
+                        AlertDialog dlg = new AlertDialog.Builder(getActivity())
+                                .setTitle("我的上传")
                                 .setView(sv)
                                 .setNegativeButton(R.string.btn_close, null)
-                                .show();
+                                .create();
+                        uploadDlg = dlg;
+                        try {
+                            dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                                public void onDismiss(DialogInterface d) { uploadDlg = null; }
+                            });
+                        } catch (Throwable ignore) {}
+                        dlg.show();
                     }
                 });
             }
@@ -914,6 +935,14 @@ public class ChatFragment extends Fragment {
                         }
                         toast("已删除，返还 " + r.optInt("refund", 0) + " 积分");
                         if (host != null) host.refreshPoints();
+                        // 关掉旧的上传弹窗并立刻重开，列表当场更新；
+                        // 同时重载聊天，历史里的图片才会变成「图片已被删除」。
+                        if (uploadDlg != null) {
+                            try { uploadDlg.dismiss(); } catch (Throwable ignore) {}
+                            uploadDlg = null;
+                        }
+                        showUploads();
+                        loadHistory();
                     }
                 });
             }
@@ -941,8 +970,9 @@ public class ChatFragment extends Fragment {
         // 菜单贴在长按位置下方（下方没空间就翻上方），不再居中弹窗 + 灰遮罩
         View anchor = (lv != null) ? lv : getActivity().findViewById(android.R.id.content);
         final String target = bgTarget();
+        // 消息栏长按不显示免打扰：那是好友 / 频道页的设置项
         MsgMenu.show(getActivity(), anchor, lastTouchX, lastTouchY, acts,
-                Prefs.muted(target), new MsgMenu.Callback() {
+                false, false, new MsgMenu.Callback() {
                     public void onAction(String a) {
                         if ("__mute_on".equals(a)) {
                             Prefs.muted(target, true);

@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
@@ -28,6 +29,7 @@ public class FriendsFragment extends Fragment {
 
     public MainActivity host;
     private ListView lvChannel, lvFriend;
+    private float chTouchX = 0f, chTouchY = 0f, frTouchX = 0f, frTouchY = 0f;
     private final List<Models.Channel> chans = new ArrayList<Models.Channel>();
     private final List<Models.Friend> friends = new ArrayList<Models.Friend>();
     private BaseAdapter chAd, frAd;
@@ -76,9 +78,15 @@ public class FriendsFragment extends Fragment {
         });
 
         // 长按频道：置顶 / 退出频道
+        lvChannel.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View vv, MotionEvent ev) {
+                chTouchX = ev.getX(); chTouchY = ev.getY();
+                return false;
+            }
+        });
         lvChannel.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             public boolean onItemLongClick(AdapterView<?> p, View v2, int pos, long id) {
-                showChannelMenu(chans.get(pos));
+                showChannelMenu(chans.get(pos), chTouchX, chTouchY);
                 return true;
             }
         });
@@ -144,9 +152,15 @@ public class FriendsFragment extends Fragment {
             }
         });
 
+        lvFriend.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View vv, MotionEvent ev) {
+                frTouchX = ev.getX(); frTouchY = ev.getY();
+                return false;
+            }
+        });
         lvFriend.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             public boolean onItemLongClick(AdapterView<?> p, View v2, int pos, long id) {
-                showFriendMenu(friends.get(pos));
+                showFriendMenu(friends.get(pos), frTouchX, frTouchY);
                 return true;
             }
         });
@@ -163,21 +177,34 @@ public class FriendsFragment extends Fragment {
         return v;
     }
 
-    /** 频道长按菜单：置顶频道 / 退出频道 */
-    private void showChannelMenu(final Models.Channel ch) {
+    /**
+     * 频道长按菜单：置顶 / 退出 / 免打扰（开关）。
+     * 菜单贴在长按位置下方，不用居中弹窗（不铺灰遮罩）。
+     */
+    private void showChannelMenu(final Models.Channel ch, float x, float y) {
         if (getActivity() == null) return;
         final List<String> acts = new ArrayList<String>();
         acts.add(ch.pinned ? "取消置顶" : "置顶频道");
         acts.add("退出频道");
+        final String target = "频道" + ch.code;
 
-        new AlertDialog.Builder(getActivity())
-                .setTitle(ch.name)
-                .setItems(acts.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        if (w == 0) doPinChannel(ch);
-                        else confirmQuitChannel(ch);
+        MsgMenu.show(getActivity(), lvChannel, x, y, acts, Prefs.muted(target),
+                new MsgMenu.Callback() {
+                    public void onAction(String a) {
+                        if ("__mute_on".equals(a)) {
+                            Prefs.muted(target, true);
+                            toast("已开启免打扰（仍会接收，但不再通知）");
+                            return;
+                        }
+                        if ("__mute_off".equals(a)) {
+                            Prefs.muted(target, false);
+                            toast("已关闭免打扰");
+                            return;
+                        }
+                        if ("退出频道".equals(a)) confirmQuitChannel(ch);
+                        else doPinChannel(ch);
                     }
-                }).show();
+                });
     }
 
     private void doPinChannel(final Models.Channel ch) {
@@ -365,18 +392,43 @@ public class FriendsFragment extends Fragment {
         lv.setLayoutParams(lp);
     }
 
+    /** 个性化切换后重新拉取，让新名称色立刻生效 */
+    public void reloadForStyleChange() {
+        try {
+            loadFriends();
+            loadChannels();
+        } catch (Throwable ignore) {}
+    }
+
     // ---------- 好友菜单：置顶 / 删除 ----------
-    private void showFriendMenu(final Models.Friend f) {
-        String[] acts = f.pinned ? new String[]{"取消置顶", "删除好友"}
-                                 : new String[]{"置顶", "删除好友"};
-        new AlertDialog.Builder(getActivity())
-                .setTitle(f.username)
-                .setItems(acts, new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) {
-                        if (w == 0) doPin(f, !f.pinned);
-                        else confirmDelete(f);
+    /**
+     * 好友长按菜单：置顶 / 删除 / 免打扰（开关）。
+     * 免打扰放在这里（好友页），不在消息栏里 —— 它是「对这个会话」的设置。
+     */
+    private void showFriendMenu(final Models.Friend f, float x, float y) {
+        if (getActivity() == null) return;
+        final List<String> acts = new ArrayList<String>();
+        acts.add(f.pinned ? "取消置顶" : "置顶");
+        acts.add("删除好友");
+        final String target = "与" + f.username + "私聊";
+
+        MsgMenu.show(getActivity(), lvFriend, x, y, acts, Prefs.muted(target),
+                new MsgMenu.Callback() {
+                    public void onAction(String a) {
+                        if ("__mute_on".equals(a)) {
+                            Prefs.muted(target, true);
+                            toast("已开启免打扰（仍会接收，但不再通知）");
+                            return;
+                        }
+                        if ("__mute_off".equals(a)) {
+                            Prefs.muted(target, false);
+                            toast("已关闭免打扰");
+                            return;
+                        }
+                        if ("删除好友".equals(a)) confirmDelete(f);
+                        else doPin(f, !f.pinned);
                     }
-                }).show();
+                });
     }
 
     private void confirmDelete(final Models.Friend f) {

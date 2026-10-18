@@ -171,12 +171,17 @@ public class MsgAdapter extends BaseAdapter {
         return f.format(new java.util.Date(ts * 1000));
     }
 
+    /** 消息图片解码上限：取屏幕短边，保证列表里也是清晰的 */
+    private static final int THUMB_W = Math.min(
+            android.content.res.Resources.getSystem().getDisplayMetrics().widthPixels,
+            android.content.res.Resources.getSystem().getDisplayMetrics().heightPixels);
+
     /** 加载消息图片：命中缓存直接显示，否则先显示「图片加载中…」 */
     private void loadImg(final ViewHolder vh, final String content) {
         final String url = Api.absUrl(content);
         if (url.isEmpty()) { vh.imgLoading.setVisibility(View.GONE); return; }
 
-        Bitmap cached = ImgLoader.cached(url);
+        Bitmap cached = ImgLoader.cached(url, THUMB_W, THUMB_W);
         if (cached != null) {
             vh.imgLoading.setVisibility(View.GONE);
             vh.img.setVisibility(View.VISIBLE);
@@ -191,13 +196,15 @@ public class MsgAdapter extends BaseAdapter {
 
         new Thread(new Runnable() {
             public void run() {
-                final Bitmap bm = ImgLoader.fetch(url, 640, 640);
+                // 之前只解码到 640px，列表里看着就是糊的。
+                // 提到 1080 并按尺寸分桶缓存，跟全屏预览各存各的。
+                final Bitmap bm = ImgLoader.fetch(url, THUMB_W, THUMB_W);
                 vh.img.post(new Runnable() {
                     public void run() {
                         if (!url.equals(vh.img.getTag())) return;
                         // 图片已被删除（原图不存在）时明确提示，不能一直停在「加载中」
                         if (bm != null) {
-                            ImgLoader.put(url, bm);
+                            ImgLoader.put(url, THUMB_W, THUMB_W, bm);
                             vh.img.setImageBitmap(bm);
                             vh.imgLoading.setVisibility(View.GONE);
                             vh.img.setVisibility(View.VISIBLE);

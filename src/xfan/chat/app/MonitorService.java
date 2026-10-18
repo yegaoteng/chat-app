@@ -3,6 +3,7 @@ package xfan.chat.app;
 import android.app.Service;
 import android.content.Intent;
 import android.os.Handler;
+import android.net.Uri;
 import android.os.IBinder;
 import android.os.Looper;
 import android.util.Log;
@@ -23,7 +24,7 @@ import java.util.Map;
  */
 public class MonitorService extends Service {
 
-    private static final long MSG_EVERY = 60_000L;
+    private static final long MSG_EVERY = 20_000L;
     private static final long VER_EVERY = 3_600_000L;
 
     private final Handler h = new Handler(Looper.getMainLooper());
@@ -84,29 +85,30 @@ public class MonitorService extends Service {
 
         new Thread(new Runnable() {
             public void run() {
-                // 频道列表
+                // 频道列表。注意返回的 key 是 channels，不是 list
                 JSONObject ch = Api.get("user.php?action=my_channels");
-                JSONArray arr = (ch == null) ? null : ch.optJSONArray("list");
+                JSONArray arr = (ch == null) ? null : ch.optJSONArray("channels");
                 if (arr != null) {
                     for (int i = 0; i < arr.length(); i++) {
-                        String code = arr.optJSONObject(i) == null ? ""
-                                : arr.optJSONObject(i).optString("code", "");
+                        JSONObject o = arr.optJSONObject(i);
+                        if (o == null) continue;
+                        String code = o.optString("code", "");
                         if (code.isEmpty()) continue;
-                        scan("频道" + code, "user.php?action=messages&channel="
-                                + java.net.URLEncoder.encode(code));
+                        scan("频道" + code, "user.php?action=ch_history&code="
+                                + Uri.encode(code));
                     }
                 }
-                // 私聊列表
+                // 私聊列表。接口名是 pm_history（不是 pm），返回 key 是 friends
                 JSONObject fr = Api.get("user.php?action=friends");
-                JSONArray fa = (fr == null) ? null : fr.optJSONArray("list");
+                JSONArray fa = (fr == null) ? null : fr.optJSONArray("friends");
                 if (fa != null) {
                     for (int i = 0; i < fa.length(); i++) {
                         JSONObject o = fa.optJSONObject(i);
                         if (o == null) continue;
                         String nm = o.optString("username", "");
                         if (nm.isEmpty()) continue;
-                        scan("与" + nm + "私聊", "user.php?action=pm&peer="
-                                + java.net.URLEncoder.encode(nm));
+                        scan("与" + nm + "私聊", "user.php?action=pm_history&peer="
+                                + Uri.encode(nm));
                     }
                 }
             }
@@ -124,8 +126,8 @@ public class MonitorService extends Service {
         if (prev == null) return;          // 首次只记录基线，不补历史通知
         if (ts <= prev) return;
 
-        JSONArray arr = r.optJSONArray("list");
-        if (arr == null) arr = r.optJSONArray("messages");
+        JSONArray arr = r.optJSONArray("messages");
+        if (arr == null) arr = r.optJSONArray("list");
         if (arr == null || arr.length() == 0) return;
         JSONObject last = arr.optJSONObject(arr.length() - 1);
         if (last == null) return;

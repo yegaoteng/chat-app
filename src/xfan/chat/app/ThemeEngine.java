@@ -180,6 +180,12 @@ public class ThemeEngine {
         return RAINBOW[((i % RAINBOW.length) + RAINBOW.length) % RAINBOW.length];
     }
 
+    /** 气泡填充用的七色：半透明，保证文字可读 */
+    private static final int[] FILL_RAINBOW = {
+            0x40FF3B30, 0x40FF9500, 0x40FFCC00,
+            0x4034C759, 0x4000C7BE, 0x40007AFF, 0x40AF52DE
+    };
+
     /** 普通名称颜色（非彩虹时） */
     public static int namePlainColor() {
         return namePlainColorFor(nameKey());
@@ -267,12 +273,14 @@ public class ThemeEngine {
             if (b.width() <= 0 || b.height() <= 0) return;
             rc.set(b.left + 1.5f, b.top + 1.5f, b.right - 1.5f, b.bottom - 1.5f);
 
-            // 填充：自己的更明显，别人的淡一点（不抢文字）
+            // 填充：七色渐变，且跟着描边一起流动。
+            // 之前这里只画了竖直双色渐变，别人看过来就是一层白底 ——
+            // 只有边框在动，里面是死的。
             float wf = rc.width();
-            fillP.setShader(new LinearGradient(0, rc.top, 0, rc.bottom,
-                    self ? 0x55FF0080 : 0x33FFFFFF,
-                    self ? 0x5500C7BE : 0x33F2F2F2,
-                    Shader.TileMode.CLAMP));
+            fillP.setShader(new LinearGradient(
+                    rc.left + off, rc.top,
+                    rc.left + off + Math.max(wf, 120f), rc.bottom,
+                    FILL_RAINBOW, null, Shader.TileMode.MIRROR));
             c.drawRoundRect(rc, radius, radius, fillP);
 
             // 七彩描边：渐变整体平移，视觉上就是流彩

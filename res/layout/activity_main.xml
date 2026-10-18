@@ -125,7 +125,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="@string/tab_chat"
-                        android:textColor="@color/accent"
+                        android:textColor="#FF000000"
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -152,7 +152,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="@string/tab_friends"
-                        android:textColor="@color/text_sub"
+                        android:textColor="#FF000000"
                         android:textSize="11sp" />
                 </LinearLayout>
 
@@ -178,7 +178,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="@string/tab_me"
-                        android:textColor="@color/text_sub"
+                        android:textColor="#FF000000"
                         android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>

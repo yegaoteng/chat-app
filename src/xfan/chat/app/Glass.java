@@ -181,17 +181,10 @@ public class Glass {
             gd.setColor(0xF2FFFFFF);
             gd.setStroke(1, 0x33000000);
             v.setBackgroundDrawable(gd);
+            // 不设 elevation / outline：
+            // 抬高后系统会在四个角画投影，看上去就是「右下、左下的三角阴影」。
             if (android.os.Build.VERSION.SDK_INT >= 21) {
-                try {
-                    v.setElevation(dp(v.getContext(), 12));
-                    v.setOutlineProvider(new android.view.ViewOutlineProvider() {
-                        @Override
-                        public void getOutline(View view, android.graphics.Outline o) {
-                            o.setRoundRect(0, 0, view.getWidth(), view.getHeight(), r);
-                        }
-                    });
-                    v.setClipToOutline(true);
-                } catch (Throwable ignore) {}
+                try { v.setElevation(0f); } catch (Throwable ignore) {}
             }
         } catch (Throwable ignore) {}
     }
