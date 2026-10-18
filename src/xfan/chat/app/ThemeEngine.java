@@ -110,15 +110,18 @@ public class ThemeEngine {
      * @param self 是否为自己发送的消息
      */
     /** 默认气泡（用自己的偏好） */
-    public static GradientDrawable bubble(boolean self) {
+    public static Drawable bubble(boolean self) {
         return bubbleFor(bubbleKey(), self);
     }
 
     /**
      * 按指定气泡 key 生成背景。
      * 服务端会在每条消息里回填发送者的 bubble，所以别人看到的也是对方的个性化气泡。
+     *
+     * 返回类型必须是 Drawable 而不是 GradientDrawable：
+     * 七色流彩气泡是自绘的 RainbowDrawable，它继承 Drawable，不能转成 GradientDrawable。
      */
-    public static GradientDrawable bubbleFor(String bubbleKey, boolean self) {
+    public static Drawable bubbleFor(String bubbleKey, boolean self) {
         String k = (bubbleKey == null || bubbleKey.isEmpty()) ? "default" : bubbleKey;
         GradientDrawable gd = new GradientDrawable();
 
