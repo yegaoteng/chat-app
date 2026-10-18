@@ -27,6 +27,7 @@ public class MeFragment extends Fragment {
     private ImageView ivAvatar;
     private TextView tvName, tvBio, tvPts, tvVer, tvUid;
     private Button btnSign, btnInvite, btnBio, btnRename, btnAvatar, btnLogout, btnUpdate;
+    private Button btnDisplay;
     private ProgressBar pbUpdate;
     private android.widget.ProgressBar pbSign;
     private String inviteCode = "";
@@ -54,6 +55,7 @@ public class MeFragment extends Fragment {
         btnAvatar = v.findViewById(R.id.btnAvatar);
         btnLogout = v.findViewById(R.id.btnLogout);
         btnUpdate = v.findViewById(R.id.btnUpdate);
+        btnDisplay = v.findViewById(R.id.btnDisplay);
         pbUpdate  = v.findViewById(R.id.pbUpdate);
 
         try {
@@ -91,6 +93,16 @@ public class MeFragment extends Fragment {
         btnUpdate.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) { checkUpdate(); }
         });
+        // 显示设置：选帧率（60/90/120/144）
+        btnDisplay.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v2) {
+                if (getActivity() == null) return;
+                Fps.show(getActivity(), new Runnable() {
+                    public void run() { refreshFpsLabel(); }
+                });
+            }
+        });
+        refreshFpsLabel();
         btnLogout.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) {
                 new AlertDialog.Builder(getActivity())
@@ -107,6 +119,8 @@ public class MeFragment extends Fragment {
             }
         });
         applyTheme();
+        // 恢复上次选的帧率
+        if (getActivity() != null) Fps.apply(getActivity(), Prefs.fps());
         // 视图刚建好：如果资料早就回来了，这里补一次
         if (pending != null) applyProfile(pending);
         else if (host != null) host.loadProfile();
@@ -283,6 +297,16 @@ public class MeFragment extends Fragment {
                         }).start();
                     }
                 }).show();
+    }
+
+    /** 按钮上直接显示当前帧率档位 */
+    private void refreshFpsLabel() {
+        if (btnDisplay == null) return;
+        int f = Prefs.fps();
+        float hz = (getActivity() == null) ? 60f : Fps.screenHz(getActivity());
+        btnDisplay.setText(f > 0
+                ? ("显示设置（" + f + " Hz）")
+                : ("显示设置（跟随 " + Math.round(hz) + " Hz）"));
     }
 
     /** 全屏查看自己的头像；没有头像时提示先上传 */

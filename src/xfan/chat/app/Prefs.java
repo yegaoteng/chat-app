@@ -45,6 +45,12 @@ public class Prefs {
     }
     public static void points(int v) { put("points", String.valueOf(v)); }
 
+    /** 目标帧率，0 表示跟随系统 */
+    public static int fps() {
+        try { return Integer.parseInt(get("fps", "0")); } catch (Exception e) { return 0; }
+    }
+    public static void fps(int v) { put("fps", String.valueOf(v)); }
+
     public static String theme() { return get("theme", "default"); }
     public static void theme(String v) { put("theme", v); }
 

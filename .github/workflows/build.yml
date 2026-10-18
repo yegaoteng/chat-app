@@ -127,7 +127,10 @@ jobs:
               echo "签名参数：使用 app/signing.properties"
             fi
           else
-            echo "签名：未配置固定 keystore，本次用临时 debug 密钥（安装时会与旧包冲突）"
+            # 不允许降级：仓库里没有 keystore 就让构建失败，避免产出装不上的包
+            echo "::error::未找到 app/keystore.jks，且未配置 SIGN_KEYSTORE_BASE64"
+            echo "请上传 app/keystore.jks（二进制文件上传），或在 Secrets 里配置 SIGN_KEYSTORE_BASE64"
+            exit 1
           fi
 
       - name: Build Debug APK

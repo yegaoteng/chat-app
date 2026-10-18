@@ -1,19 +1,14 @@
 apply plugin: 'com.android.application'
 
-// ==================== 固定签名 ====================
-// 问题：GitHub Actions 每次都是全新虚拟机，Gradle 会自动生成一把临时 debug 密钥，
-//       下次构建又是一把新的。Android 要求同包名必须用同一把签名才能覆盖安装，
-//       所以每次装新包都会报「与现有软件包存在冲突」，必须先卸载。
+// ==================== 固定签名（唯一签名，不允许降级） ====================
+// GitHub Actions 每次都是全新虚拟机，Gradle 会自动生成临时 debug 密钥，
+// 每构建一次换一把，安装时就会报「与现有软件包存在冲突」。
+// 这里强制使用唯一的自定义 keystore；校验不过直接让构建失败，
+// 绝不退回临时密钥 —— 否则又会出现装不上的问题。
 //
-// 解决：提供自己的 keystore，构建时统一用它签名。
-//   方式 A（简单）：把 keystore.jks 放到本文件同级目录（app/）一起推到仓库
-//   方式 B（安全）：把 keystore 转 base64 存进 GitHub Secrets，见 workflow
-//
-// 两种方式都不影响构建：没找到 keystore 时自动退回默认 debug 签名，不会构建失败。
+// keystore.jks 放在本文件同级目录（app/），与源码一起推到仓库。
+// 如需改密码，在 app/ 下放 signing.properties（四行，见文件末尾注释）覆盖即可。
 
-// 读取顺序：环境变量 > app/signing.properties > 内置默认值
-// 自己生成密钥时，如果密码/别名不一样，在 app/ 下放一个 signing.properties 即可，
-// 内容四行（见文件末尾注释），不用改本文件。
 def signProps = new Properties()
 def spFile = file("signing.properties")
 if (spFile.exists()) {
@@ -29,17 +24,11 @@ def envOr = { String envKey, String propKey, String defVal ->
 def ksEnvPath = System.getenv("SIGN_KEYSTORE") ?: ""
 def ksFile    = ksEnvPath ? file(ksEnvPath)
                           : file(envOr("SIGN_KEYSTORE_FILE", "keystore.file", "keystore.jks"))
-def ksPwd     = envOr("SIGN_STORE_PASSWORD", "store.password", "xfan123456")
-def kaPwd     = envOr("SIGN_KEY_PASSWORD",   "key.password",   "xfan123456")
+def ksPwd     = envOr("SIGN_STORE_PASSWORD", "store.password", "xfanapp")
+def kaPwd     = envOr("SIGN_KEY_PASSWORD",   "key.password",   "2287681747")
 def kaAlias   = envOr("SIGN_KEY_ALIAS",      "key.alias",      "xfan")
 
-/**
- * 真实校验：先试着打开密钥库并用密码取出私钥。
- * 之前只判断「文件存在」就直接用，一旦密码不对或文件损坏，
- * 构建会在签名阶段抛 UnrecoverableKeyException / BadPaddingException 直接失败。
- * 这里提前验一次：验不过就退回默认 debug 签名，构建照样成功，
- * 并在日志里打印明确原因，而不是一堆看不懂的堆栈。
- */
+// 真实校验：打开密钥库并用密码取出私钥，确认真能签名。
 def ksUsable = false
 def ksReason = "keystore 文件不存在：${ksFile}"
 if (ksFile.exists()) {
@@ -67,7 +56,11 @@ if (ksFile.exists()) {
 }
 println("[signing] keystore=${ksFile}  usable=${ksUsable}  reason=${ksReason}")
 if (!ksUsable) {
-    println("[signing] !!! 固定签名不可用，本次改用默认 debug 密钥（安装时会与旧包冲突）")
+    // 不允许降级：降级出来的包装不上，还不如直接暴露问题
+    throw new org.gradle.api.GradleException(
+        "固定签名不可用：" + ksReason + "\n" +
+        "请确认 app/keystore.jks 已随源码上传（二进制文件上传，不要用复制粘贴），" +
+        "且 store.password / key.password / key.alias 正确。")
 }
 
 android {
@@ -105,22 +98,17 @@ android {
     signingConfigs {
         // 用显式 create：在容器闭包里写 if 时比 fixed{} 更稳，
         // 避免不同 Gradle 版本对方法缺失转发的差异。
-        if (ksUsable) {
-            create("fixed") {
-                storeFile     ksFile
-                storePassword ksPwd
-                keyAlias      kaAlias
-                keyPassword   kaPwd
-            }
+        create("fixed") {
+            storeFile     ksFile
+            storePassword ksPwd
+            keyAlias      kaAlias
+            keyPassword   kaPwd
         }
     }
 
     buildTypes {
         debug {
-            // 有固定 keystore 就覆盖 debug 的默认临时密钥
-            if (ksUsable) {
-                signingConfig signingConfigs.getByName("fixed")
-            }
+            signingConfig signingConfigs.getByName("fixed")
         }
     }
 }
@@ -130,13 +118,17 @@ dependencies {
 }
 
 // ---------------------------------------------------------------------------
-// 自己生成密钥后，若密码 / 别名与默认不同，在 app/ 目录建 signing.properties：
+// 当前使用的固定签名（已在上面写死为默认值，无需额外配置）：
 //
 //   keystore.file=keystore.jks
-//   store.password=你的库密码
-//   key.password=你的密钥密码
-//   key.alias=你的别名
+//   store.password=xfanapp
+//   key.password=2287681747
+//   key.alias=xfan
 //
-// 也可以用 GitHub Secrets 传递（优先级更高）：
+// 若将来换了密钥，改 app/signing.properties（四行，格式同上）即可覆盖，
+// 或改用 GitHub Secrets（优先级更高）：
 //   SIGN_KEYSTORE_BASE64 / SIGN_STORE_PASSWORD / SIGN_KEY_PASSWORD / SIGN_KEY_ALIAS
+//
+// 注意：keystore.jks 必须随源码一起上传（二进制文件上传，不要用复制粘贴）。
+// 没有它构建会直接失败 —— 因为降级成临时密钥打出的包装不上。
 // ---------------------------------------------------------------------------

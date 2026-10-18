@@ -29,6 +29,7 @@ public class MainActivity extends Activity {
     private FrameLayout drawerRoot;
     private LinearLayout drawerPanel, drawerBody;
     private TextView tvTitle, tvPoints, tabChat, tabFriends, tabMe;
+    private View dockIndicator;
     private boolean drawerOpen = false;
 
     public ChatFragment fChat;
@@ -103,6 +104,7 @@ public class MainActivity extends Activity {
 
         // 每一步单独容错：任何一处异常都不会导致整个页面闪退
         try { applyTheme(); } catch (Throwable t) { Log.e("XFAN", "applyTheme", t); }
+        setupDock();
         try { switchTab(0); } catch (Throwable t) { Log.e("XFAN", "switchTab", t); }
         try { loadProfile(); } catch (Throwable t) { Log.e("XFAN", "loadProfile", t); }
         try { UpdateManager.check(this); } catch (Throwable t) { Log.e("XFAN", "update", t); }
@@ -134,6 +136,44 @@ public class MainActivity extends Activity {
     }
 
     // ---------- 页面切换（带过渡动画）----------
+    /** 底部 Dock：玻璃底板 + 跟随选中项滑动的指示层 */
+    private void setupDock() {
+        View glass = findViewById(R.id.dockGlass);
+        if (glass != null) Glass.background(glass, false, 24f);
+        dockIndicator = findViewById(R.id.dockIndicator);
+        final View wrap = findViewById(R.id.dockWrap);
+        if (wrap != null) {
+            wrap.post(new Runnable() {
+                public void run() { moveDockIndicator(curTab, false); }
+            });
+        }
+    }
+
+    private void moveDockIndicator(int t, boolean animate) {
+        final View ind = dockIndicator;
+        View target = (t == 0) ? tabChat : (t == 1 ? tabFriends : tabMe);
+        if (ind == null || target == null) return;
+        int w = target.getWidth();
+        if (w <= 0) return;
+        int pad = Glass.dp(this, 5);
+        android.view.ViewGroup.LayoutParams lp = ind.getLayoutParams();
+        if (lp == null) lp = new android.widget.FrameLayout.LayoutParams(w - pad * 2,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+        lp.width = w - pad * 2;
+        ind.setLayoutParams(lp);
+        ind.setVisibility(View.VISIBLE);
+
+        final float toX = target.getLeft() + pad;
+        if (animate) {
+            ind.animate().cancel();
+            ind.animate().translationX(toX).setDuration(280)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
+                    .start();
+        } else {
+            ind.setTranslationX(toX);
+        }
+    }
+
     private void switchTab(int t) {
         if (t == curTab && fChat != null && fChat.isAdded() && !fChat.isHidden()
                 && t == 0) {
@@ -176,6 +216,7 @@ public class MainActivity extends Activity {
         tvTitle.setText(t == 0 ? getString(R.string.tab_chat)
                 : t == 1 ? getString(R.string.tab_friends) : getString(R.string.tab_me));
         syncTopRight(Prefs.points());
+        moveDockIndicator(t, true);
 
         animateContent(toRight);
 
@@ -379,17 +420,14 @@ public class MainActivity extends Activity {
      * 抽屉里的可点击项统一套「圆角矩形按钮」边框，
      * 让用户一眼看出这里能点（之前是纯文字，看不出可交互）。
      */
+    /** 侧边栏按钮：液态玻璃底 + 文字居中 + 按压动效 */
     private void asButton(View v) {
-        if (v == null) return;
-        v.setBackgroundResource(R.drawable.bg_sidebar_btn);
-        v.setClickable(true);
+        Glass.apply(v, false, 8f);
     }
 
-    /** 当前选中项：边框加粗、底色更亮 */
+    /** 当前选中项：更亮的玻璃底 + 蓝色描边 */
     private void asButtonOn(View v) {
-        if (v == null) return;
-        v.setBackgroundResource(R.drawable.bg_sidebar_btn_on);
-        v.setClickable(true);
+        Glass.apply(v, true, 8f);
     }
 
     private TextView sectionTitle(String s) {

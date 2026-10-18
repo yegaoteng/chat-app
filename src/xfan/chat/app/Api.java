@@ -252,25 +252,29 @@ public class Api {
             c.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + BOUND);
 
             DataOutputStream dos = new DataOutputStream(c.getOutputStream());
+            // 注意：writeBytes 会丢掉每个字符的高 8 位，中文会变乱码。
+            // 聊天背景的会话名（如「频道87681747」「与yy私聊」）含中文，
+            // 用 writeBytes 发送会让服务端存下乱码文件名，之后再按正确中文去查就查不到。
+            // 这里统一按 UTF-8 写字节。
             // type 字段
             if (type != null) {
-                dos.writeBytes("--" + BOUND + "\r\n");
-                dos.writeBytes("Content-Disposition: form-data; name=\"type\"\r\n\r\n");
-                dos.writeBytes(type + "\r\n");
+                w(dos, "--" + BOUND + "\r\n");
+                w(dos, "Content-Disposition: form-data; name=\"type\"\r\n\r\n");
+                w(dos, type + "\r\n");
             }
             if (extra != null) {
                 for (Map.Entry<String, String> e : extra.entrySet()) {
-                    dos.writeBytes("--" + BOUND + "\r\n");
-                    dos.writeBytes("Content-Disposition: form-data; name=\"" + e.getKey() + "\"\r\n\r\n");
-                    dos.writeBytes(e.getValue() + "\r\n");
+                    w(dos, "--" + BOUND + "\r\n");
+                    w(dos, "Content-Disposition: form-data; name=\"" + e.getKey() + "\"\r\n\r\n");
+                    w(dos, e.getValue() + "\r\n");
                 }
             }
             // 文件
             String field = "file";
-            dos.writeBytes("--" + BOUND + "\r\n");
-            dos.writeBytes("Content-Disposition: form-data; name=\"" + field
+            w(dos, "--" + BOUND + "\r\n");
+            w(dos, "Content-Disposition: form-data; name=\"" + field
                     + "\"; filename=\"" + file.getName() + "\"\r\n");
-            dos.writeBytes("Content-Type: application/octet-stream\r\n\r\n");
+            w(dos, "Content-Type: application/octet-stream\r\n\r\n");
             FileInputStream fis = new FileInputStream(file);
             byte[] buf = new byte[8192];
             int n;
@@ -289,6 +293,11 @@ public class Api {
             Log.w(TAG, "UPLOAD " + path + " failed: " + e);
             return null;
         }
+    }
+
+    /** 按 UTF-8 写字符串（DataOutputStream.writeBytes 会破坏非 ASCII 字符） */
+    private static void w(DataOutputStream dos, String str) throws java.io.IOException {
+        dos.write(str.getBytes("UTF-8"));
     }
 
     /** 通过 WebView 取原始文本 */
