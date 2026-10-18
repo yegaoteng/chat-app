@@ -92,9 +92,50 @@ jobs:
           echo "--- app/build.gradle ---"
           cat app/build.gradle 2>/dev/null || echo "app/build.gradle 缺失"
 
+      - name: Prepare signing keystore
+        env:
+          KS_B64:   ${{ secrets.SIGN_KEYSTORE_BASE64 }}
+          KS_PWD:   ${{ secrets.SIGN_STORE_PASSWORD }}
+          KA_PWD:   ${{ secrets.SIGN_KEY_PASSWORD }}
+          KA_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
+        run: |
+          # 方式 B：Secrets 里存了 base64 keystore（推荐，仓库里不留密钥文件）
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > /tmp/signing.jks
+            echo "SIGN_KEYSTORE=/tmp/signing.jks" >> "$GITHUB_ENV"
+            echo "SIGN_STORE_PASSWORD=$KS_PWD"     >> "$GITHUB_ENV"
+            echo "SIGN_KEY_PASSWORD=$KA_PWD"       >> "$GITHUB_ENV"
+            if [ -n "$KA_ALIAS" ]; then
+              echo "SIGN_KEY_ALIAS=$KA_ALIAS" >> "$GITHUB_ENV"
+            fi
+            echo "签名：使用 GitHub Secrets 中的 keystore"
+          elif [ -f app/keystore.jks ]; then
+            # 方式 A：仓库里带了 keystore.jks（密码可用 app/signing.properties 覆盖）
+            echo "签名：使用仓库内 app/keystore.jks"
+            if [ -f app/signing.properties ]; then
+              echo "签名参数：使用 app/signing.properties"
+            fi
+          else
+            echo "签名：未配置固定 keystore，本次用临时 debug 密钥（安装时会与旧包冲突）"
+          fi
+
       - name: Build Debug APK
         run: |
           "$GRADLE_HOME/bin/gradle" :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Show APK signature
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk 2>/dev/null | head -1)
+          echo "apk: $APK"
+          if [ -n "$APK" ]; then
+            # 打印签名指纹，方便确认每次构建是否一致
+            KS=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner 2>/dev/null | head -1)
+            if [ -n "$KS" ]; then
+              "$KS" verify --print-certs "$APK" 2>/dev/null | grep -E "DN:|SHA-1|SHA-256" || echo "(apksigner 无输出)"
+            else
+              echo "(未找到 apksigner)"
+            fi
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

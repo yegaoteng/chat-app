@@ -1,5 +1,39 @@
 apply plugin: 'com.android.application'
 
+// ==================== 固定签名 ====================
+// 问题：GitHub Actions 每次都是全新虚拟机，Gradle 会自动生成一把临时 debug 密钥，
+//       下次构建又是一把新的。Android 要求同包名必须用同一把签名才能覆盖安装，
+//       所以每次装新包都会报「与现有软件包存在冲突」，必须先卸载。
+//
+// 解决：提供自己的 keystore，构建时统一用它签名。
+//   方式 A（简单）：把 keystore.jks 放到本文件同级目录（app/）一起推到仓库
+//   方式 B（安全）：把 keystore 转 base64 存进 GitHub Secrets，见 workflow
+//
+// 两种方式都不影响构建：没找到 keystore 时自动退回默认 debug 签名，不会构建失败。
+
+// 读取顺序：环境变量 > app/signing.properties > 内置默认值
+// 自己生成密钥时，如果密码/别名不一样，在 app/ 下放一个 signing.properties 即可，
+// 内容四行（见文件末尾注释），不用改本文件。
+def signProps = new Properties()
+def spFile = file("signing.properties")
+if (spFile.exists()) {
+    spFile.withInputStream { signProps.load(it) }
+}
+def envOr = { String envKey, String propKey, String defVal ->
+    def v = System.getenv(envKey)
+    if (v != null && !v.isEmpty()) return v
+    v = signProps.getProperty(propKey)
+    return (v != null && !v.isEmpty()) ? v : defVal
+}
+
+def ksEnvPath = System.getenv("SIGN_KEYSTORE") ?: ""
+def ksFile    = ksEnvPath ? file(ksEnvPath)
+                          : file(envOr("SIGN_KEYSTORE_FILE", "keystore.file", "keystore.jks"))
+def ksPwd     = envOr("SIGN_STORE_PASSWORD", "store.password", "xfan123456")
+def kaPwd     = envOr("SIGN_KEY_PASSWORD",   "key.password",   "xfan123456")
+def kaAlias   = envOr("SIGN_KEY_ALIAS",      "key.alias",      "xfan")
+def useFixed  = ksFile.exists()
+
 android {
     namespace "xfan.chat.app"
     compileSdk 33
@@ -31,8 +65,42 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
+    signingConfigs {
+        // 用显式 create：在容器闭包里写 if 时比 fixed{} 更稳，
+        // 避免不同 Gradle 版本对方法缺失转发的差异。
+        if (useFixed) {
+            create("fixed") {
+                storeFile     ksFile
+                storePassword ksPwd
+                keyAlias      kaAlias
+                keyPassword   kaPwd
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // 有固定 keystore 就覆盖 debug 的默认临时密钥
+            if (useFixed) {
+                signingConfig signingConfigs.getByName("fixed")
+            }
+        }
+    }
 }
 
 // 零第三方依赖：只用 Android SDK 自带 API 与系统 org.json
 dependencies {
 }
+
+// ---------------------------------------------------------------------------
+// 自己生成密钥后，若密码 / 别名与默认不同，在 app/ 目录建 signing.properties：
+//
+//   keystore.file=keystore.jks
+//   store.password=你的库密码
+//   key.password=你的密钥密码
+//   key.alias=你的别名
+//
+// 也可以用 GitHub Secrets 传递（优先级更高）：
+//   SIGN_KEYSTORE_BASE64 / SIGN_STORE_PASSWORD / SIGN_KEY_PASSWORD / SIGN_KEY_ALIAS
+// ---------------------------------------------------------------------------
