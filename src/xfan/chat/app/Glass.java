@@ -133,11 +133,19 @@ public class Glass {
 
     // ---------- 对外接口 ----------
 
-    /** 参数用 Context 而不是 View：Activity / View 都能直接传 */
+    /**
+     * dp 转 px。
+     * 提供 Context 与 View 两个重载：View 本身不是 Context（它是 Object 子类），
+     * 之前只收 Context 时传 View 会编译失败。
+     */
     public static int dp(Context c, float v0) {
         float d = (c != null && c.getResources() != null)
                 ? c.getResources().getDisplayMetrics().density : 2f;
         return (int) (v0 * d + 0.5f);
+    }
+
+    public static int dp(View v, float v0) {
+        return dp(v == null ? null : v.getContext(), v0);
     }
 
     /**
@@ -150,7 +158,7 @@ public class Glass {
 
     public static GlassDrawable apply(View v, boolean selected, float radiusDp) {
         if (v == null) return null;
-        GlassDrawable d = new GlassDrawable(dp(v, radiusDp), selected);
+        GlassDrawable d = new GlassDrawable(dp(v == null ? null : v.getContext(), radiusDp), selected);
         v.setBackground(d);
         v.setClickable(true);
         if (v instanceof TextView) {
@@ -163,7 +171,7 @@ public class Glass {
     /** 只换背景，不动重力/点击（容器用） */
     public static GlassDrawable background(View v, boolean selected, float radiusDp) {
         if (v == null) return null;
-        GlassDrawable d = new GlassDrawable(dp(v, radiusDp), selected);
+        GlassDrawable d = new GlassDrawable(dp(v == null ? null : v.getContext(), radiusDp), selected);
         v.setBackground(d);
         return d;
     }
