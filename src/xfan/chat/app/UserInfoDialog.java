@@ -14,21 +14,66 @@ import org.json.JSONObject;
 /** 用户资料卡：点头像 / 点昵称时弹出。 */
 public class UserInfoDialog {
 
-    /** 弹出资料卡。host 用于提供 Activity 与后续操作入口。 */
+    /** 防抖：连点头像会连开多个弹窗，得一个个关。1.2 秒内只认第一次。 */
+    private static long lastShowAt = 0;
+    private static String lastShowWho = "";
+    private static final long DEBOUNCE_MS = 1200;
+
+    /** 弹出资料卡。先显示弹窗再填数据，数据回来前显示「加载用户资料中」。 */
     public static void show(final ChatFragment host, final String username) {
         if (host == null || username == null || username.isEmpty()) return;
         if (host.getActivity() == null) return;
 
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (username.equals(lastShowWho) && now - lastShowAt < DEBOUNCE_MS) return;
+        lastShowAt = now;
+        lastShowWho = username;
+
+        final android.app.AlertDialog[] holder = new android.app.AlertDialog[1];
+        final boolean[] done = new boolean[1];
+
+        // 先弹窗
+        android.app.AlertDialog d0 = new android.app.AlertDialog.Builder(host.getActivity())
+                .setTitle("资料")
+                .setView(loadingView(host))
+                .setNegativeButton("关闭", null)
+                .show();
+        holder[0] = d0;
+        if (done[0]) return;
+
         host.loadUserInfo(username, new ChatFragment.UserInfoCb() {
             public void onDone(final JSONObject d) {
+                if (host.getActivity() == null) return;
+                try { if (holder[0] != null) holder[0].dismiss(); } catch (Throwable ignore) {}
                 if (d == null) {
                     host.toast("读取资料失败");
                     return;
                 }
-                if (host.getActivity() == null) return;
                 render(host, d);
             }
         });
+    }
+
+    /** 资料加载中的占位视图 */
+    private static View loadingView(final ChatFragment host) {
+        LinearLayout box = new LinearLayout(host.getActivity());
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(40, 40, 40, 40);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        android.widget.ProgressBar pb = new android.widget.ProgressBar(host.getActivity());
+        pb.setLayoutParams(new LinearLayout.LayoutParams(44, 44));
+
+        TextView tv = new TextView(host.getActivity());
+        tv.setText("加载用户资料中");
+        tv.setTextSize(13);
+        tv.setTextColor(ThemeEngine.themeTextSub());
+        tv.setGravity(Gravity.CENTER);
+        tv.setPadding(0, 14, 0, 0);
+
+        box.addView(pb);
+        box.addView(tv);
+        return box;
     }
 
     private static void render(final ChatFragment host, final JSONObject d) {
@@ -55,7 +100,7 @@ public class UserInfoDialog {
         iv.setLayoutParams(lp);
         iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
         if (!avatar.isEmpty()) {
-            new ImgLoader(iv).load(Api.absUrl(avatar), 400, 400);
+            new ImgLoader(iv).load(Api.absUrl(avatar), 720, 720);
         } else {
             iv.setImageDrawable(new Avatars(name));
         }

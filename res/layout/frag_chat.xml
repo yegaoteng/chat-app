@@ -19,6 +19,15 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
+        <!-- 当前会话的自定义背景（半透明 50%） -->
+        <ImageView
+            android:id="@+id/ivChatBg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:alpha="0.5"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+
         <ListView
             android:id="@+id/lvMsg"
             android:layout_width="match_parent"

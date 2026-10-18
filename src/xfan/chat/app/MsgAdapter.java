@@ -117,6 +117,8 @@ public class MsgAdapter extends BaseAdapter {
             vh.body.setVisibility(View.GONE);
             vh.img.setVisibility(View.GONE);
             vh.imgLoading.setVisibility(View.VISIBLE);
+            vh.imgLoading.setText("图片加载中…");
+            vh.imgLoading.setTextColor(ThemeEngine.themeTextSub());
             vh.img.setImageDrawable(null);
             loadImg(vh, m.content);
         } else {
@@ -189,15 +191,22 @@ public class MsgAdapter extends BaseAdapter {
         new Thread(new Runnable() {
             public void run() {
                 final Bitmap bm = ImgLoader.fetch(url, 640, 640);
-                if (bm == null) return;
-                ImgLoader.put(url, bm);
                 vh.img.post(new Runnable() {
                     public void run() {
                         if (!url.equals(vh.img.getTag())) return;
-                        vh.img.setImageBitmap(bm);
-                        vh.imgLoading.setVisibility(View.GONE);
-                        vh.img.setVisibility(View.VISIBLE);
-                        bindImageClick(vh, content);
+                        // 图片已被删除（原图不存在）时明确提示，不能一直停在「加载中」
+                        if (bm != null) {
+                            ImgLoader.put(url, bm);
+                            vh.img.setImageBitmap(bm);
+                            vh.imgLoading.setVisibility(View.GONE);
+                            vh.img.setVisibility(View.VISIBLE);
+                            bindImageClick(vh, content);
+                        } else {
+                            vh.img.setVisibility(View.GONE);
+                            vh.imgLoading.setVisibility(View.VISIBLE);
+                            vh.imgLoading.setText("图片已被删除");
+                            vh.imgLoading.setTextColor(0xFF9E9E9E);
+                        }
                     }
                 });
             }

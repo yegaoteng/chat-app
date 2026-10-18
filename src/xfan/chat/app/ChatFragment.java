@@ -16,6 +16,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -55,6 +56,8 @@ public class ChatFragment extends Fragment {
 
     private static final int REQ_PICK = 101;
     private static final int REQ_PICK_AVATAR = 102;
+    private static final int REQ_PICK_BG = 103;
+    private ImageView ivChatBg;
 
     /** 当前正在引用的消息 */
     private Models.Msg quoting = null;
@@ -68,6 +71,7 @@ public class ChatFragment extends Fragment {
         lv = v.findViewById(R.id.lvMsg);
         edMsg = v.findViewById(R.id.edMsg);
         tvOnline = v.findViewById(R.id.tvOnline);
+        ivChatBg = v.findViewById(R.id.ivChatBg);
         pbSending = v.findViewById(R.id.pbSending);
         inputArea = v.findViewById(R.id.inputArea);
         loadingBar = v.findViewById(R.id.loadingBar);
@@ -200,6 +204,7 @@ public class ChatFragment extends Fragment {
     public void openChannel(String code, String name) {
         mode = "channel";
         channelCode = code;
+        loadChatBg();
         channelName = name;
         peer = "";
         clearQuote();
@@ -213,6 +218,7 @@ public class ChatFragment extends Fragment {
         mode = "pm";
         peer = who;
         channelCode = "";
+        loadChatBg();
         clearQuote();
         reset();
         showLoading(true);
@@ -536,7 +542,63 @@ public class ChatFragment extends Fragment {
         Uri uri = d.getData();
         String path = Resolver.getPath(getActivity(), uri);
         if (path == null || !(new File(path).exists())) { toast("无法读取该文件"); return; }
-        if (req == REQ_PICK) uploadAndSend(path);
+        if (req == REQ_PICK_BG) { uploadChatBg(path); return; }
+        // 选完图先报价确认，不立即上传
+        if (req == REQ_PICK) quoteThenUpload(path);
+    }
+
+    /** 选完图 -> 先问服务器扣多少分 -> 用户确认才真正上传 */
+    private void quoteThenUpload(final String path) {
+        final File f = new File(path);
+        final long size = f.length();
+        String ext = "";
+        int dot = path.lastIndexOf('.');
+        if (dot > 0) ext = path.substring(dot + 1).toLowerCase();
+
+        final String ex = ext;
+        toast("计算中…");
+        new Thread(new Runnable() {
+            public void run() {
+                JSONObject q = Api.get("file.php?action=quote&size=" + size
+                        + "&ext=" + java.net.URLEncoder.encode(ex));
+                ui(new Runnable() {
+                    public void run() {
+                        if (q == null || !q.optBoolean("success", false)) {
+                            // 拿不到报价就按本地估算，仍然让用户确认
+                            boolean anim = "gif".equals(ex);
+                            int est = (int) Math.ceil(size / (anim ? 512.0 : 1536.0));
+                            confirmUpload(path, est, est / 2, -1, anim);
+                            return;
+                        }
+                        confirmUpload(path, q.optInt("cost", 0), q.optInt("refund", 0),
+                                q.optInt("points", -1), q.optInt("animated", 0) == 1);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** 确认弹窗：显示这张图要消耗多少积分、删除可返还多少 */
+    private void confirmUpload(final String path, final int cost, final int refund,
+                               final int points, final boolean anim) {
+        if (getActivity() == null) return;
+        StringBuilder sb = new StringBuilder();
+        sb.append("文件：").append(new File(path).getName()).append("\n");
+        sb.append("大小：").append(String.format("%.1f", new File(path).length() / 1024.0))
+          .append(" KB\n");
+        sb.append(anim ? "类型：动图（每 KB 2 积分）\n" : "类型：图片\n");
+        sb.append("\n消耗积分：").append(cost).append(" 分\n");
+        sb.append("删除可返还：").append(refund).append(" 分（50%）");
+        if (points >= 0) sb.append("\n\n当前积分：").append(points).append(" 分");
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle("确认上传")
+                .setMessage(sb.toString())
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确认上传", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { uploadAndSend(path); }
+                })
+                .show();
     }
 
     private void uploadAndSend(final String path) {
@@ -556,6 +618,67 @@ public class ChatFragment extends Fragment {
                         toast("上传完成，消耗 " + r.optInt("cost", 0) + " 积分");
                         doSend(r.optString("url", ""), "image",
                                 r.optString("filename", ""), r.optInt("size", 0));
+                    }
+                });
+            }
+        }).start();
+    }
+
+    // ---------- 聊天背景 ----------
+
+    /** 会话标识：频道名 或 与谁私聊 */
+    private String bgTarget() {
+        return channelCode.isEmpty() ? ("与" + peer + "私聊") : ("频道" + channelCode);
+    }
+
+    private void loadChatBg() {
+        if (ivChatBg == null || bgTarget().isEmpty()) return;
+        if (channelCode.isEmpty() && peer.isEmpty()) return;
+        new Thread(new Runnable() {
+            public void run() {
+                final JSONObject r = Api.get("file.php?action=chat_bg&target="
+                        + java.net.URLEncoder.encode(bgTarget()));
+                ui(new Runnable() {
+                    public void run() {
+                        if (ivChatBg == null) return;
+                        String u = (r == null) ? "" : r.optString("url", "");
+                        if (u.isEmpty()) { ivChatBg.setVisibility(View.GONE); return; }
+                        ivChatBg.setVisibility(View.VISIBLE);
+                        ivChatBg.setTag(Api.absUrl(u));
+                        new ImgLoader(ivChatBg).load(Api.absUrl(u), 1080, 1920);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** 顶部「设置聊天背景」入口 */
+    public void pickChatBg() {
+        if (getActivity() == null) return;
+        if (channelCode.isEmpty() && peer.isEmpty()) { toast("请先进入频道或私聊"); return; }
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        i.setType("image/*");
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(i, REQ_PICK_BG);
+    }
+
+    private void uploadChatBg(final String path) {
+        final File f = new File(path);
+        toast("设置中…");
+        new Thread(new Runnable() {
+            public void run() {
+                HashMap<String, String> ex = new HashMap<String, String>();
+                ex.put("target", bgTarget());
+                final JSONObject r = Api.upload("file.php?action=set_chat_bg", f, "image", ex);
+                ui(new Runnable() {
+                    public void run() {
+                        if (r == null) { toast("设置失败（可能是服务器拦截了上传）"); return; }
+                        if (!r.optBoolean("success", false)) {
+                            toast(r.optString("error", "设置失败"));
+                            return;
+                        }
+                        toast("已设置聊天背景");
+                        loadChatBg();
                     }
                 });
             }
@@ -586,26 +709,30 @@ public class ChatFragment extends Fragment {
                         // 删除必须用它，否则会删错。
                         final List<String> keys = new ArrayList<String>();
 
+                        // 关键：三种形态来自同一份数据，只能取其一。
+                        // 之前三个都遍历，同一张图被 collect 多次 —— 这就是「重复显示两张」的根因。
+                        boolean got = false;
+
                         JSONArray gl = r.optJSONArray("groups_list");
-                        if (gl != null) {
+                        if (!got && gl != null && gl.length() > 0) {
                             for (int i = 0; i < gl.length(); i++) {
                                 JSONObject day = gl.optJSONObject(i);
                                 if (day == null) continue;
                                 collect(day.optJSONArray("items"), urls, names, keys);
                             }
+                            got = !urls.isEmpty();
                         }
 
                         JSONObject go = r.optJSONObject("groups");
-                        if (go != null) {
+                        if (!got && go != null && go.length() > 0) {
                             java.util.Iterator<String> it = go.keys();
                             while (it.hasNext()) {
                                 collect(go.optJSONArray(it.next()), urls, names, keys);
                             }
+                            got = !urls.isEmpty();
                         }
 
-                        collect(r.optJSONArray("items"), urls, names, keys);
-                        // 注意：上面 collect 已经处理过 items 了，
-                        // 这里不能再遍历一遍，否则每张图都会重复出现两次。
+                        if (!got) collect(r.optJSONArray("items"), urls, names, keys);
                         if (urls.isEmpty()) { toast("还没有上传记录"); return; }
 
                         // 带缩略图的网格，点一下直接发送
@@ -702,6 +829,8 @@ public class ChatFragment extends Fragment {
             String u = it.optString("url", "");
             if (u.isEmpty()) u = it.optString("path", "");
             if (u.isEmpty()) continue;
+            // 同一张图可能在多份数据里重复出现，按 url 再拦一道
+            if (urls.contains(u)) continue;
             urls.add(u);
             names.add(it.optString("name", "图片"));
             // 老服务端没有 key：用 url 的文件名兜底（同样是唯一的）
@@ -827,7 +956,13 @@ public class ChatFragment extends Fragment {
                             toast(r.optString("error", "撤回失败"));
                             return;
                         }
-                        toast("已撤回");
+                        int back = r.optInt("refund", 0);
+                        if (back > 0) {
+                            toast("已撤回，返还 " + back + " 积分");
+                            if (host != null) host.refreshPoints();
+                        } else {
+                            toast("已撤回");
+                        }
                         loadHistory();
                     }
                 });

@@ -158,7 +158,8 @@ public class MeFragment extends Fragment {
 
         String av = r.optString("avatar", "");
         avatarUrl = av;
-        if (!av.isEmpty()) new ImgLoader(ivAvatar).load(Api.absUrl(av), 200, 200);
+        // 我的页头像要看得清，按屏幕短边解码（之前固定 200px 显得糊）
+        if (!av.isEmpty()) new ImgLoader(ivAvatar).load(Api.absUrl(av), 720, 720);
         else if (ivAvatar != null) ivAvatar.setImageDrawable(new Avatars(name));
         applyTheme();
     }

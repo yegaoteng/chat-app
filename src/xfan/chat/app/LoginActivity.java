@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
 import android.widget.ProgressBar;
+import android.widget.VideoView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -57,6 +58,7 @@ public class LoginActivity extends Activity {
         pbLogin  = findViewById(R.id.pbLogin);
         boxLogin = findViewById(R.id.boxLogin);
         startTypewriter();
+        setupVideoBg();
 
         String u = Prefs.user();
         if (u != null && !u.isEmpty()) edUser.setText(u);
@@ -119,11 +121,13 @@ public class LoginActivity extends Activity {
         });
     }
 
-    /** 标题打字机效果（带闪烁光标） */
+    /**
+     * 标题打字机：打完 -> 逐字删除 -> 再打印，循环。
+     * 用 Choreographer 按帧回调推进，自动适配 60/90/120Hz 高刷屏。
+     */
     private void startTypewriter() {
         if (tvTitle == null) return;
         final String full = getString(R.string.app_name);
-        final int[] idx = {0};
 
         // 光标闪烁
         final Runnable blink = new Runnable() {
@@ -136,17 +140,78 @@ public class LoginActivity extends Activity {
         };
         hTitle.post(blink);
 
-        Runnable type = new Runnable() {
-            public void run() {
+        final int TYPE_MS = 150, ERASE_MS = 90, HOLD_MS = 1200;
+        final int[] n = {0};              // 当前显示字数
+        final int[] phase = {0};          // 0=打字 1=停顿 2=删除
+        final long[] mark = {0};
+
+        final android.view.Choreographer.FrameCallback fc =
+                new android.view.Choreographer.FrameCallback() {
+            public void doFrame(long frameTimeNanos) {
                 if (tvTitle == null) return;
-                if (idx[0] <= full.length()) {
-                    tvTitle.setText(full.substring(0, idx[0]));
-                    idx[0]++;
-                    hTitle.postDelayed(this, 150);   // 每个字符 150ms
+                long now = frameTimeNanos / 1000000L;
+                if (mark[0] == 0) mark[0] = now;
+                long el = now - mark[0];
+
+                if (phase[0] == 0) {
+                    if (el >= TYPE_MS) {
+                        mark[0] = now;
+                        if (n[0] < full.length()) { n[0]++; tvTitle.setText(full.substring(0, n[0])); }
+                        else { phase[0] = 1; }
+                    }
+                } else if (phase[0] == 1) {
+                    if (el >= HOLD_MS) { mark[0] = now; phase[0] = 2; }
+                } else {
+                    if (el >= ERASE_MS) {
+                        mark[0] = now;
+                        if (n[0] > 0) { n[0]--; tvTitle.setText(full.substring(0, n[0])); }
+                        else { phase[0] = 0; }
+                    }
                 }
+                android.view.Choreographer.getInstance().postFrameCallback(this);
             }
         };
-        hTitle.postDelayed(type, 400);
+        android.view.Choreographer.getInstance().postFrameCallback(fc);
+    }
+
+    /** 视频背景：assets/login_bg.mp4（没有就保持纯色背景） */
+    private void setupVideoBg() {
+        VideoView vv = findViewById(R.id.videoBg);
+        View mask = findViewById(R.id.videoMask);
+        if (vv == null) return;
+        try {
+            java.io.InputStream in = getAssets().open("login_bg.mp4");
+            java.io.File f = new java.io.File(getFilesDir(), "login_bg.mp4");
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+            byte[] buf = new byte[8192];
+            int len;
+            while ((len = in.read(buf)) > 0) fos.write(buf, 0, len);
+            fos.close(); in.close();
+
+            vv.setVideoPath(f.getAbsolutePath());
+            if (mask != null) mask.setVisibility(View.VISIBLE);
+            vv.setOnPreparedListener(new android.media.MediaPlayer.OnPreparedListener() {
+                public void onPrepared(android.media.MediaPlayer mp) {
+                    mp.setLooping(true);
+                    // 居中裁切铺满
+                    mp.setVideoScalingMode(
+                            android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
+                    mp.setVolume(0f, 0f);   // 静音
+                    vv.start();
+                }
+            });
+            vv.setOnErrorListener(new android.media.MediaPlayer.OnErrorListener() {
+                public boolean onError(android.media.MediaPlayer mp, int what, int extra) {
+                    vv.setVisibility(View.GONE);
+                    if (mask != null) mask.setVisibility(View.GONE);
+                    return true;
+                }
+            });
+        } catch (Throwable ignore) {
+            // 没有视频文件就退回纯色背景
+            vv.setVisibility(View.GONE);
+            if (mask != null) mask.setVisibility(View.GONE);
+        }
     }
 
     /** 收起输入法 */
@@ -161,25 +226,29 @@ public class LoginActivity extends Activity {
         } catch (Throwable ignore) {}
     }
 
-    /** 登录中：顶部提示 + 6 秒进度条（从右往左） */
+    /** 登录中：顶部提示 + 6 秒绿色进度条（从右往左清空） */
     private void showLogging() {
         hideKeyboard();
         if (tvLogging != null) tvLogging.setVisibility(View.VISIBLE);
         if (pbLogin == null) return;
         pbLogin.setVisibility(View.VISIBLE);
-        pbLogin.setProgress(100);
+        pbLogin.setProgress(pbLogin.getMax());
 
-        final int TOTAL = 6000, STEP = 60;
-        final int[] left = {TOTAL};
-        hTitle.post(new Runnable() {
-            public void run() {
-                left[0] -= STEP;
-                if (left[0] < 0) left[0] = 0;
-                // 从右往左：进度条随时间推移逐渐清空
-                pbLogin.setProgress((int) (left[0] * 100L / TOTAL));
-                if (left[0] > 0) hTitle.postDelayed(this, STEP);
+        // 用 Choreographer 按帧推进：高刷屏上更顺滑
+        final long start = android.os.SystemClock.elapsedRealtime();
+        final android.view.Choreographer.FrameCallback fc =
+                new android.view.Choreographer.FrameCallback() {
+            public void doFrame(long t) {
+                long el = android.os.SystemClock.elapsedRealtime() - start;
+                float k = 1f - el / 6000f;
+                if (k < 0f) k = 0f;
+                pbLogin.setProgress((int) (k * pbLogin.getMax()));
+                if (k > 0f && pbLogin.getVisibility() == View.VISIBLE) {
+                    android.view.Choreographer.getInstance().postFrameCallback(this);
+                }
             }
-        });
+        };
+        android.view.Choreographer.getInstance().postFrameCallback(fc);
     }
 
     private void hideLogging() {

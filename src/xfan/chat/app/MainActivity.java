@@ -175,6 +175,7 @@ public class MainActivity extends Activity {
 
         tvTitle.setText(t == 0 ? getString(R.string.tab_chat)
                 : t == 1 ? getString(R.string.tab_friends) : getString(R.string.tab_me));
+        syncTopRight(Prefs.points());
 
         animateContent(toRight);
 
@@ -246,6 +247,25 @@ public class MainActivity extends Activity {
         });
     }
 
+    /**
+     * 右上角：聊天页显示「设置聊天背景」（点击可换背景），
+     * 好友/我的页显示积分。
+     */
+    private void syncTopRight(int pts) {
+        if (tvPoints == null) return;
+        if (curTab == 0) {
+            tvPoints.setText("设置聊天背景");
+            tvPoints.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    if (fChat != null) fChat.pickChatBg();
+                }
+            });
+        } else {
+            tvPoints.setText(pts + " 分");
+            tvPoints.setOnClickListener(null);
+        }
+    }
+
     // ---------- 抽屉 ----------
     private void toggleDrawer() {
         if (drawerOpen) closeDrawer(); else openDrawer();
@@ -312,7 +332,7 @@ public class MainActivity extends Activity {
                         Prefs.theme(r.optString("theme", "default"));
                         Prefs.bubble(r.optString("bubble", "default"));
                         Prefs.namecolor(r.optString("namecolor", "default"));
-                        if (tvPoints != null) tvPoints.setText(pts + " 分");
+                        syncTopRight(pts);
                         applyTheme();
                         if (fMe != null) fMe.applyProfile(r);
                         if (fChat != null) fChat.applyProfile(r);
