@@ -538,9 +538,9 @@ public class ChatFragment extends Fragment {
         tvPts.setTypeface(null, android.graphics.Typeface.BOLD);
 
         TextView tvRule = new TextView(getActivity());
-        tvRule.setText("普通图片：按体积计费\n"
-                + "动图（GIF/WEBP）：每 KB 消耗 2 积分\n"
-                + "删除已上传图片：返还 50% 积分");
+        tvRule.setText("静态图片：按体积计费（约 1.5 KB = 1 积分）\n"
+                + "删除已上传图片：返还 50% 积分\n"
+                + "暂不支持 GIF 等动图");
         tvRule.setTextSize(12);
         tvRule.setTextColor(ThemeEngine.themeTextSub());
         tvRule.setPadding(0, 8, 0, 6);
@@ -555,8 +555,12 @@ public class ChatFragment extends Fragment {
                 .setPositiveButton("选择图片", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-                        // 同时允许静态图与动图
+                        // 只接受静态图片，排除 gif
                         i.setType("image/*");
+                        try {
+                            String[] types = {"image/jpeg", "image/png", "image/webp"};
+                            i.putExtra(Intent.EXTRA_MIME_TYPES, types);
+                        } catch (Throwable ignore) {}
                         i.addCategory(Intent.CATEGORY_OPENABLE);
                         startActivityForResult(i, REQ_PICK);
                     }
@@ -595,13 +599,12 @@ public class ChatFragment extends Fragment {
                     public void run() {
                         if (q == null || !q.optBoolean("success", false)) {
                             // 拿不到报价就按本地估算，仍然让用户确认
-                            boolean anim = "gif".equals(ex);
-                            int est = (int) Math.ceil(size / (anim ? 512.0 : 1536.0));
-                            confirmUpload(path, est, est / 2, -1, anim);
+                            int est = (int) Math.ceil(size / 1536.0);
+                            confirmUpload(path, est, est / 2, -1);
                             return;
                         }
                         confirmUpload(path, q.optInt("cost", 0), q.optInt("refund", 0),
-                                q.optInt("points", -1), q.optInt("animated", 0) == 1);
+                                q.optInt("points", -1));
                     }
                 });
             }
@@ -610,13 +613,13 @@ public class ChatFragment extends Fragment {
 
     /** 确认弹窗：显示这张图要消耗多少积分、删除可返还多少 */
     private void confirmUpload(final String path, final int cost, final int refund,
-                               final int points, final boolean anim) {
+                               final int points) {
         if (getActivity() == null) return;
         StringBuilder sb = new StringBuilder();
         sb.append("文件：").append(new File(path).getName()).append("\n");
         sb.append("大小：").append(String.format("%.1f", new File(path).length() / 1024.0))
           .append(" KB\n");
-        sb.append(anim ? "类型：动图（每 KB 2 积分）\n" : "类型：图片\n");
+        sb.append("类型：图片\n");
         sb.append("\n消耗积分：").append(cost).append(" 分\n");
         sb.append("删除可返还：").append(refund).append(" 分（50%）");
         if (points >= 0) sb.append("\n\n当前积分：").append(points).append(" 分");
@@ -1069,17 +1072,28 @@ public class ChatFragment extends Fragment {
             m.bubble = o.optString("bubble", "");
             m.namecolor = o.optString("namecolor", "");
             m.replyTo = o.optLong("reply_to", 0);
+            // 服务端已回填引用信息，直接用；拿不到再用本地兜底
+            m.replyName = o.optString("reply_name", "");
+            m.replyText = o.optString("reply_text", "");
             out.add(m);
         }
         return out;
     }
 
-    /** 引用后，回填被引用者的昵称与摘要，供气泡上方展示 */
+    /**
+     * 回填引用的昵称与摘要。
+     * 服务端已返回 reply_name / reply_text，这里只在缺失时用本地数据兜底：
+     * 先在「已加载 + 本次新增」里找被引用那条（增量轮询时它可能只在本次返回里）。
+     */
     private void fillQuote(List<Models.Msg> got) {
         if (got == null || got.isEmpty()) return;
+        List<Models.Msg> all = new ArrayList<Models.Msg>();
+        all.addAll(data);
+        all.addAll(got);
         for (Models.Msg m : got) {
             if (m.replyTo <= 0) continue;
-            for (Models.Msg src : data) {
+            if (!m.replyName.isEmpty()) continue;   // 服务端给了就用服务端的
+            for (Models.Msg src : all) {
                 if (src.id > 0 && src.id == m.replyTo) {
                     m.replyName = src.username;
                     m.replyText = "image".equals(src.type) ? "[图片]" : src.content;

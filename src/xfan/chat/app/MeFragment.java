@@ -62,6 +62,17 @@ public class MeFragment extends Fragment {
             tvVer.setText("v" + getActivity().getPackageManager()
                     .getPackageInfo(getActivity().getPackageName(), 0).versionName);
         } catch (Exception ignore) {}
+        // 点版本号 -> 打开官网
+        if (tvVer != null) {
+            tvVer.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v3) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://xiaof.hyperphp.com/chatapp/")));
+                    } catch (Throwable ignore) { toast("无法打开网页"); }
+                }
+            });
+        }
 
         // 点头像 -> 全屏查看自己的头像
         ivAvatar.setOnClickListener(new View.OnClickListener() {
