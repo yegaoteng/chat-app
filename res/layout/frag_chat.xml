@@ -19,12 +19,13 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- 当前会话的自定义背景（半透明 50%） -->
+        <!-- 当前会话的自定义背景（半透明 40%）；scaleType 由代码按横竖屏切换 -->
         <ImageView
             android:id="@+id/ivChatBg"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:alpha="0.5"
+            android:alpha="0.4"
+            android:adjustViewBounds="false"
             android:scaleType="centerCrop"
             android:visibility="gone" />
 

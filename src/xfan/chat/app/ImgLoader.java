@@ -79,6 +79,28 @@ public class ImgLoader {
         };
     }
 
+    /**
+     * 丢弃某个地址的所有缓存副本。
+     * 换聊天背景时同名文件会让界面一直显示上一张，必须显式清掉。
+     */
+    public static void evict(String url) {
+        if (url == null || url.isEmpty()) return;
+        try {
+            java.util.Map<String, Bitmap> snap = cache.snapshot();
+            for (String k : snap.keySet()) {
+                if (k != null && k.startsWith(url)) cache.remove(k);
+            }
+        } catch (Throwable ignore) {}
+        // 磁盘缓存：按常见尺寸各删一份
+        if (diskDir != null) {
+            int[][] sizes = {{0, 0}, {1080, 1920}, {1920, 1080}, {720, 720}, {640, 640}};
+            for (int[] s : sizes) {
+                java.io.File f = diskFile(url, s[0], s[1]);
+                if (f != null && f.exists()) { try { f.delete(); } catch (Throwable ignore) {} }
+            }
+        }
+    }
+
     private final ImageView iv;
 
     public ImgLoader(ImageView v) { iv = v; }

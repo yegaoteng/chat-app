@@ -643,9 +643,26 @@ public class ChatFragment extends Fragment {
                         if (ivChatBg == null) return;
                         String u = (r == null) ? "" : r.optString("url", "");
                         if (u.isEmpty()) { ivChatBg.setVisibility(View.GONE); return; }
+
+                        // 版本号：服务器换了新背景 v 就会变，URL 跟着变，
+                        // 于是自然绕过图片缓存；没换时 URL 稳定，仍走 24 小时缓存。
+                        long v = (r == null) ? 0 : r.optLong("v", 0);
+                        String full = Api.absUrl(u);
+                        if (v > 0) full += (full.contains("?") ? "&" : "?") + "v=" + v;
+
+                        // 横屏：完整显示并居中（竖屏才裁切铺满）
+                        boolean land = false;
+                        try {
+                            land = getResources().getConfiguration().orientation
+                                    == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+                        } catch (Throwable ignore) {}
+                        ivChatBg.setScaleType(land
+                                ? ImageView.ScaleType.FIT_CENTER
+                                : ImageView.ScaleType.CENTER_CROP);
+
                         ivChatBg.setVisibility(View.VISIBLE);
-                        ivChatBg.setTag(Api.absUrl(u));
-                        new ImgLoader(ivChatBg).load(Api.absUrl(u), 1080, 1920);
+                        ivChatBg.setTag(full);
+                        new ImgLoader(ivChatBg).load(full, land ? 1920 : 1080, land ? 1080 : 1920);
                     }
                 });
             }
@@ -678,6 +695,10 @@ public class ChatFragment extends Fragment {
                             return;
                         }
                         toast("已设置聊天背景");
+                        // 旧背景已由服务端删除，本地缓存里的那份也要丢掉，
+                        // 否则同名文件会让界面一直显示上一张。
+                        String nu = r.optString("url", "");
+                        if (!nu.isEmpty()) ImgLoader.evict(Api.absUrl(nu));
                         loadChatBg();
                     }
                 });

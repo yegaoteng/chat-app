@@ -148,9 +148,8 @@ public class UpdateManager {
                 .setNegativeButton("稍后再说", null)
                 .setPositiveButton("下载更新", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d2, int w) {
-                        try {
-                            act.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                        } catch (Exception ignore) {}
+                        // 内置下载器：直接在应用内下载并安装，不再跳浏览器
+                        ApkDownloader.start(act, url, vname);
                     }
                 })
                 .create();

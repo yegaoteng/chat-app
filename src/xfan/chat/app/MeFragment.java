@@ -122,6 +122,11 @@ public class MeFragment extends Fragment {
         // 恢复上次选的帧率
         if (getActivity() != null) Fps.apply(getActivity(), Prefs.fps());
         // 视图刚建好：如果资料早就回来了，这里补一次
+        // 先用本地缓存填一次，避免刚进来右上角/积分位是空的、等网络回来才补
+        if (tvPts != null) tvPts.setText(Prefs.points() + " 分");
+        if (tvName != null && !Prefs.user().isEmpty()) tvName.setText(Prefs.user());
+        if (tvUid != null && !Prefs.uid().isEmpty()) tvUid.setText("UID：" + Prefs.uid());
+
         if (pending != null) applyProfile(pending);
         else if (host != null) host.loadProfile();
         return v;

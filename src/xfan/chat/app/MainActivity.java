@@ -6,7 +6,10 @@ import android.app.Fragment;
 import android.app.FragmentTransaction;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
@@ -36,6 +39,13 @@ public class MainActivity extends Activity {
     public FriendsFragment fFriends;
     public MeFragment fMe;
     private int curTab = 0;   // 0 聊天 1 好友 2 我的
+
+    /** Dock 拖拽用的主线程 Handler（长按判定 + 指示层移动） */
+    private final Handler dockH = new Handler(Looper.getMainLooper());
+
+    /** 侧边栏文字配色：未选中白、选中蓝 */
+    private static final int WHITE_OFF = 0xFFFFFFFF;
+    private static final int BLUE_ON   = 0xFF4EA3FF;
 
     public static MainActivity self;
 
@@ -77,6 +87,9 @@ public class MainActivity extends Activity {
         tabChat     = findViewById(R.id.tabChat);
         tabFriends  = findViewById(R.id.tabFriends);
         tabMe       = findViewById(R.id.tabMe);
+
+        // 先用本地缓存把右上角填上，别等网络回来才出现（否则看着像缺了一块 UI）
+        syncTopRight(Prefs.points());
 
         fChat = new ChatFragment();
         fFriends = new FriendsFragment();
@@ -136,20 +149,120 @@ public class MainActivity extends Activity {
     }
 
     // ---------- 页面切换（带过渡动画）----------
-    /** 底部 Dock：玻璃底板 + 跟随选中项滑动的指示层 */
+    /** 底部 Dock：液态玻璃底板 + 深蓝选中层（可长按拖动切页） */
     private void setupDock() {
         View glass = findViewById(R.id.dockGlass);
         if (glass != null) Glass.background(glass, false, 24f);
         dockIndicator = findViewById(R.id.dockIndicator);
         final View wrap = findViewById(R.id.dockWrap);
         if (wrap != null) {
+            // 底板在 padding 区域也能接到触摸，padding 处长按同样可拖
+            attachDockDrag(wrap);
             wrap.post(new Runnable() {
                 public void run() { moveDockIndicator(curTab, false); }
             });
         }
+        // 标签本身也挂上：选中层压在标签下面，长按标签即等于长按选中层
+        attachDockDrag(tabChat);
+        attachDockDrag(tabFriends);
+        attachDockDrag(tabMe);
     }
 
-    private void moveDockIndicator(int t, boolean animate) {
+    /**
+     * 长按 450ms 进入拖动态，之后手指横向移动，选中层跟着走；
+     * 松手吸附到最近的一页并切换。
+     */
+    private void attachDockDrag(final View v) {
+        if (v == null) return;
+        v.setOnTouchListener(new View.OnTouchListener() {
+            private boolean dragging = false;
+            private float downX = 0f, downY = 0f;
+            private Runnable armed = null;
+
+            public boolean onTouch(View view, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = e.getRawX();
+                        downY = e.getRawY();
+                        dragging = false;
+                        final float sx = downX;
+                        armed = new Runnable() {
+                            public void run() {
+                                dragging = true;
+                                dragIndicatorTo(sx, true);
+                                try {
+                                    v.performHapticFeedback(
+                                            android.view.HapticFeedbackConstants.LONG_PRESS);
+                                } catch (Throwable ignore) {}
+                            }
+                        };
+                        dockH.postDelayed(armed, 450);
+                        break;
+
+                    case MotionEvent.ACTION_MOVE:
+                        if (!dragging && armed != null
+                                && (Math.abs(e.getRawX() - downX) > 14
+                                 || Math.abs(e.getRawY() - downY) > 14)) {
+                            dockH.removeCallbacks(armed);
+                            armed = null;
+                        }
+                        if (dragging) dragIndicatorTo(e.getRawX(), false);
+                        break;
+
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (armed != null) { dockH.removeCallbacks(armed); armed = null; }
+                        if (dragging) {
+                            dragging = false;
+                            int t = dockTabAt(e.getRawX());
+                            moveDockIndicator(t, true);
+                            if (t != curTab) switchTab(t);
+                            return true;   // 吃掉这一下，避免再触发 click 重复切换
+                        }
+                        break;
+                }
+                return false;
+            }
+        });
+    }
+
+    /** 把选中层挪到手指所在的横向位置（限制在 Dock 内） */
+    private void dragIndicatorTo(float rawX, boolean animate) {
+        final View ind = dockIndicator;
+        View wrap = findViewById(R.id.dockWrap);
+        if (ind == null || wrap == null) return;
+        int[] loc = new int[2];
+        wrap.getLocationOnScreen(loc);
+        float x = rawX - loc[0] - ind.getWidth() / 2f;
+        float max = wrap.getWidth() - ind.getWidth();
+        if (x < 0) x = 0;
+        if (x > max) x = max;
+        ind.animate().cancel();
+        if (animate) {
+            ind.animate().translationX(x).setDuration(120).start();
+        } else {
+            ind.setTranslationX(x);
+        }
+    }
+
+    /** 手指位置最接近哪一页 */
+    private int dockTabAt(float rawX) {
+        View[] tabs = {tabChat, tabFriends, tabMe};
+        int best = 0;
+        float bestD = Float.MAX_VALUE;
+        int[] loc = new int[2];
+        for (int i = 0; i < tabs.length; i++) {
+            if (tabs[i] == null) continue;
+            tabs[i].getLocationOnScreen(loc);
+            float cx = loc[0] + tabs[i].getWidth() / 2f;
+            float d = Math.abs(cx - rawX);
+            if (d < bestD) { bestD = d; best = i; }
+        }
+        return best;
+    }
+
+    /** 让选中层的宽度与某一页一致 */
+    private void sizeDockIndicator(int t) {
         final View ind = dockIndicator;
         View target = (t == 0) ? tabChat : (t == 1 ? tabFriends : tabMe);
         if (ind == null || target == null) return;
@@ -157,15 +270,22 @@ public class MainActivity extends Activity {
         if (w <= 0) return;
         int pad = Glass.dp(this, 5);
         android.view.ViewGroup.LayoutParams lp = ind.getLayoutParams();
-        if (lp == null) lp = new android.widget.FrameLayout.LayoutParams(w - pad * 2,
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+        if (lp == null) lp = new android.widget.FrameLayout.LayoutParams(
+                w - pad * 2, android.view.ViewGroup.LayoutParams.MATCH_PARENT);
         lp.width = w - pad * 2;
         ind.setLayoutParams(lp);
         ind.setVisibility(View.VISIBLE);
+    }
 
+    private void moveDockIndicator(int t, boolean animate) {
+        final View ind = dockIndicator;
+        View target = (t == 0) ? tabChat : (t == 1 ? tabFriends : tabMe);
+        if (ind == null || target == null) return;
+        sizeDockIndicator(t);
+        int pad = Glass.dp(this, 5);
         final float toX = target.getLeft() + pad;
+        ind.animate().cancel();
         if (animate) {
-            ind.animate().cancel();
             ind.animate().translationX(toX).setDuration(280)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
                     .start();
@@ -294,6 +414,9 @@ public class MainActivity extends Activity {
      */
     private void syncTopRight(int pts) {
         if (tvPoints == null) return;
+        // 单行走到底，避免宽度不够被截断成半个图标
+        tvPoints.setSingleLine(true);
+        tvPoints.setMinWidth(Glass.dp(this, 56));
         if (curTab == 0) {
             tvPoints.setText("设置聊天背景");
             tvPoints.setOnClickListener(new View.OnClickListener() {
@@ -302,9 +425,12 @@ public class MainActivity extends Activity {
                 }
             });
         } else {
-            tvPoints.setText(pts + " 分");
+            // 带金币图标；pts 为 0 时也照样显示，不再空白
+            tvPoints.setText("💰 " + Math.max(0, pts) + " 分");
             tvPoints.setOnClickListener(null);
         }
+        tvPoints.setVisibility(View.VISIBLE);
+        tvPoints.invalidate();
     }
 
     // ---------- 抽屉 ----------
@@ -434,8 +560,8 @@ public class MainActivity extends Activity {
         TextView t = new TextView(this);
         t.setText(s);
         t.setTextColor(getResources().getColor(R.color.text_drawer));
-        t.setTextSize(13);
-        t.setPadding(4, 14, 4, 6);
+        t.setTextSize(14);
+        t.setPadding(4, 18, 4, 8);
         t.setTypeface(null, android.graphics.Typeface.BOLD);
         return t;
     }
@@ -470,9 +596,9 @@ public class MainActivity extends Activity {
 
         final TextView btn = new TextView(this);
         btn.setText("每日签到 (+50)");
-        btn.setTextColor(0xFF222222);
-        btn.setTextSize(14);
-        btn.setPadding(10, 12, 10, 12);
+        btn.setTextColor(WHITE_OFF);
+        btn.setTextSize(15);
+        btn.setPadding(18, 16, 18, 16);
         btn.setLayoutParams(new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         asButton(btn);
@@ -526,9 +652,9 @@ public class MainActivity extends Activity {
 
         TextView btn = new TextView(this);
         btn.setText("兑换");
-        btn.setTextColor(0xFF222222);
-        btn.setTextSize(14);
-        btn.setPadding(10, 12, 10, 12);
+        btn.setTextColor(WHITE_OFF);
+        btn.setTextSize(15);
+        btn.setPadding(18, 16, 18, 16);
         asButton(btn);
         btn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -617,16 +743,17 @@ public class MainActivity extends Activity {
             if (key.equals(cur)) label += "  ✓";
             row.setText(label);
             final boolean on = key.equals(cur);
-            row.setTextColor(on ? 0xFF2979FF : 0xFF222222);
-            row.setTextSize(13);
-            row.setPadding(14, 11, 14, 11);
+            // 未选中白色，选中蓝色（侧边栏底板是深色，白色才看得清）
+            row.setTextColor(on ? BLUE_ON : WHITE_OFF);
+            row.setTextSize(15);
+            row.setPadding(18, 16, 18, 16);
             if (on) asButtonOn(row); else asButton(row);
             markStyle(row, kind);
-            // 项间距 +1px
+            // 项间距再放大一点
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = 7;      // 原 6 + 1
+            lp.bottomMargin = 12;
             row.setLayoutParams(lp);
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { setStyle(kind, key, has, price); }

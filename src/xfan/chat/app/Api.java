@@ -38,6 +38,11 @@ public class Api {
     // 服务器地址写死在源码里，登录页不再让用户输入
     public static String SERVER = "https://ffurry.hyperphp.com/chat/appapi.php";
 
+    /** 浏览器 UA：WAF 只放行像浏览器的请求，下载 APK 也要带上 */
+    public static final String UA_BROWSER =
+            "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 "
+                    + "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+
     /** 应用启动时按 USE_HTTP 切换协议 */
     public static void applyHttpSwitch() {
         if (USE_HTTP && SERVER.startsWith("https://")) {
