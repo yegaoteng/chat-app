@@ -1,6 +1,7 @@
 package xfan.chat.app;
 
 import android.animation.ValueAnimator;
+import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.LinearGradient;
@@ -132,9 +133,10 @@ public class Glass {
 
     // ---------- 对外接口 ----------
 
-    public static int dp(View v, float v0) {
-        float d = (v != null && v.getResources() != null)
-                ? v.getResources().getDisplayMetrics().density : 2f;
+    /** 参数用 Context 而不是 View：Activity / View 都能直接传 */
+    public static int dp(Context c, float v0) {
+        float d = (c != null && c.getResources() != null)
+                ? c.getResources().getDisplayMetrics().density : 2f;
         return (int) (v0 * d + 0.5f);
     }
 

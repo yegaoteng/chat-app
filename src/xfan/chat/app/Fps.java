@@ -8,9 +8,12 @@ import android.view.WindowManager;
  * 帧率设置：60 / 90 / 120 / 144 Hz。
  *
  * 「真实流畅」不是只改个数字：
- *   1. 用 Window.setFrameRate() 告诉系统本窗口期望的刷新率（Android 11+）
- *   2. 同时设置 preferredRefreshRate，让系统把屏幕切到对应档位
- * 低于 Android 11 的机型没有这组 API，只能跟随系统。
+ * 通过 Window 属性里的 preferredRefreshRate 告诉系统本窗口期望的刷新率，
+ * 系统会据此把屏幕切到对应档位（60/90/120/144 需硬件支持，不支持的会取最接近档）。
+ * 该字段自 Android 6.0（API 23）起可用；更低版本只能跟随系统。
+ *
+ * 注意：Activity.getWindow() 返回的是 android.view.Window，不是 WindowManager，
+ * 两者不能混用；WindowManager 只在取 LayoutParams 类型时用到。
  */
 public class Fps {
 
@@ -29,7 +32,7 @@ public class Fps {
     }
 
     public static boolean supported() {
-        return android.os.Build.VERSION.SDK_INT >= 30;
+        return android.os.Build.VERSION.SDK_INT >= 23;
     }
 
     /**
@@ -40,21 +43,12 @@ public class Fps {
         if (a == null) return false;
         if (!supported()) return false;
         try {
-            WindowManager window = a.getWindow();
-            WindowManager.LayoutParams p = window.getAttributes();
-
-            if (fps > 0) {
-                p.preferredRefreshRate = (float) fps;
-                window.setAttributes(p);
-                // 声明本窗口按这个帧率渲染，系统会据此调度 vsync
-                window.setFrameRate((float) fps,
-                        WindowManager.LayoutParams.FRAME_RATE_COMPATIBILITY_DEFAULT);
-            } else {
-                p.preferredRefreshRate = 0f;
-                window.setAttributes(p);
-                window.setFrameRate(0f,
-                        WindowManager.LayoutParams.FRAME_RATE_COMPATIBILITY_DEFAULT);
-            }
+            // getWindow() 返回 Window，不是 WindowManager
+            android.view.Window w = a.getWindow();
+            if (w == null) return false;
+            WindowManager.LayoutParams p = w.getAttributes();
+            p.preferredRefreshRate = (fps > 0) ? (float) fps : 0f;
+            w.setAttributes(p);
             return true;
         } catch (Throwable t) {
             return false;
@@ -89,7 +83,7 @@ public class Fps {
                         d.dismiss();
                         android.widget.Toast.makeText(a,
                                 ok ? ("已切换到 " + (v > 0 ? v + " Hz" : "跟随系统"))
-                                   : "当前系统不支持自定义帧率（需 Android 11+）",
+                                   : "当前系统不支持自定义帧率（需 Android 6.0+）",
                                 android.widget.Toast.LENGTH_SHORT).show();
                         if (onChanged != null) onChanged.run();
                     }
