@@ -29,6 +29,9 @@ public class MeFragment extends Fragment {
     private TextView tvName, tvBio, tvPts, tvVer, tvUid;
     private Button btnSign, btnInvite, btnBio, btnRename, btnAvatar, btnLogout, btnUpdate;
     private Button btnDisplay;
+    private Button btnProfileToggle, btnPassword;
+    private LinearLayout boxProfile;
+    private boolean profileOpen = false;
     private ProgressBar pbUpdate;
     private android.widget.ProgressBar pbSign;
     private String inviteCode = "";
@@ -58,6 +61,19 @@ public class MeFragment extends Fragment {
         btnUpdate = v.findViewById(R.id.btnUpdate);
         btnDisplay = v.findViewById(R.id.btnDisplay);
         pbUpdate  = v.findViewById(R.id.pbUpdate);
+        btnProfileToggle = v.findViewById(R.id.btnProfileToggle);
+        btnPassword = v.findViewById(R.id.btnPassword);
+        boxProfile = v.findViewById(R.id.boxProfile);
+        if (btnProfileToggle != null && boxProfile != null) {
+            btnProfileToggle.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v2) { toggleProfile(); }
+            });
+        }
+        if (btnPassword != null) {
+            btnPassword.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v2) { showChangePassword(); }
+            });
+        }
 
         try {
             tvVer.setText("v" + getActivity().getPackageManager()
