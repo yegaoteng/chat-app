@@ -72,60 +72,60 @@ jobs:
       - name: Write settings.gradle
         run: |
           cat > settings.gradle <<'EOF'
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-        maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-    }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-        maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-    }
-}
-rootProject.name = 'chat'
-include ':app'
-EOF
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+                  maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
+                  maven { url 'https://maven.aliyun.com/repository/public' }
+                  maven { url 'https://maven.aliyun.com/repository/google' }
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+                  maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
+                  maven { url 'https://maven.aliyun.com/repository/public' }
+                  maven { url 'https://maven.aliyun.com/repository/google' }
+              }
+          }
+          rootProject.name = 'chat'
+          include ':app'
+          EOF
           cat settings.gradle
 
       - name: Write root build.gradle
         run: |
           cat > build.gradle <<'EOF'
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-        // Kotlin 预发布版（如 1.8.20-RC2）只在 JetBrains 自己的仓库里
-        maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
-        // 兜底镜像
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-    }
-    dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }
-    // AGP 8.1.4 会要 kotlin-stdlib-jdk8:1.8.20-RC2，公开仓库没有，统一换成正式版
-    configurations.classpath {
-        resolutionStrategy {
-            eachDependency { d ->
-                if (d.requested.group == 'org.jetbrains.kotlin'
-                        && d.requested.name.startsWith('kotlin-stdlib')) {
-                    d.useVersion '1.8.22'
-                }
-            }
-        }
-    }
-}
-EOF
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+                  // Kotlin 预发布版只在 JetBrains 自己的仓库里
+                  maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
+                  // 兜底镜像
+                  maven { url 'https://maven.aliyun.com/repository/public' }
+                  maven { url 'https://maven.aliyun.com/repository/google' }
+              }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }
+              // AGP 8.1.4 要 kotlin-stdlib-jdk8:1.8.20-RC2，公开仓库没有，统一换正式版
+              configurations.classpath {
+                  resolutionStrategy {
+                      eachDependency { d ->
+                          if (d.requested.group == 'org.jetbrains.kotlin'
+                                  && d.requested.name.startsWith('kotlin-stdlib')) {
+                              d.useVersion '1.8.22'
+                          }
+                      }
+                  }
+              }
+          }
+          EOF
           cat build.gradle
 
       - name: Write gradle.properties
