@@ -24,6 +24,7 @@ public class BootReceiver extends BroadcastReceiver {
         } catch (Throwable ignore) {}
 
         try {
+            try { MonitorJob.schedule(c); } catch (Throwable ignore) {}
             Intent si = new Intent(c, MonitorService.class);
             if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(si);
             else c.startService(si);

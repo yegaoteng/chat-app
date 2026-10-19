@@ -1,6 +1,7 @@
 package xfan.chat.app;
 
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.net.Uri;
@@ -42,16 +43,16 @@ public class MonitorService extends Service {
 
     private final Handler h = new Handler(Looper.getMainLooper());
     private long lastVer = 0L;
-    private final Map<String, Long> lastSeen = new HashMap<String, Long>();
+    private static final Map<String, Long> lastSeen = new HashMap<String, Long>();
 
     private final Runnable tick = new Runnable() {
         public void run() {
             try {
-                checkMessages();
+                checkMessages(MonitorService.this, MonitorService.this);
                 long now = System.currentTimeMillis();
                 if (now - lastVer > VER_EVERY) {
                     lastVer = now;
-                    checkVersion();
+                    checkVersion(MonitorService.this);
                 }
             } catch (Throwable t) {
                 Log.w("XFAN", "monitor tick", t);
@@ -127,6 +128,28 @@ public class MonitorService extends Service {
         super.onTaskRemoved(rootIntent);
     }
 
+    /**
+     * 立即查一次新消息（供 MonitorJob 在进程被拉起时调用）。
+     * 做成静态的，这样即使这次是系统新起的进程、服务还没走完 onCreate 也能用。
+     */
+    public static void checkOnce(Context c) {
+        if (c == null) return;
+        try {
+            Api.bindContext(c);
+            Api.applyHttpSwitch();
+        } catch (Throwable ignore) {}
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    checkMessagesStatic();
+                    checkVersionStatic();
+                } catch (Throwable t) {
+                    Log.w("XFAN", "monitor checkOnce", t);
+                }
+            }
+        }).start();
+    }
+
     @Override
     public void onDestroy() {
         try { h.removeCallbacks(tick); } catch (Throwable ignore) {}
@@ -145,8 +168,32 @@ public class MonitorService extends Service {
         }
     }
 
-    private void checkMessages() {
-        if (foreground()) return;
+    /**
+     * 查一次新消息。
+     * 做成静态的：进程被 Job 拉起时 Service 可能还没 onCreate，
+     * 这时没有实例可用，只能靠静态方法 + Context 干活。
+     */
+    static void checkMessagesStatic() {
+        final Context c = app();
+        if (c == null) return;
+        checkMessages(c, c);
+    }
+
+    static void checkVersionStatic() {
+        final Context c = app();
+        if (c == null) return;
+        checkVersion(c);
+    }
+
+    /** 全局 Context。App 在 onCreate 里登记，Job 拉起的进程同样能拿到。 */
+    private static Context app() {
+        try { return App.ctx(); } catch (Throwable ignore) {}
+        return null;
+    }
+
+    /** svc 为 null 表示由 Job 调用，此时一律当作「不在前台」 */
+    private static void checkMessages(final Context ctx, final Context svc) {
+        if (svc instanceof MonitorService && ((MonitorService) svc).foreground()) return;
         final String user = Prefs.user();
         if (user == null || user.isEmpty()) return;
 
@@ -161,7 +208,7 @@ public class MonitorService extends Service {
                         if (o == null) continue;
                         String code = o.optString("code", "");
                         if (code.isEmpty()) continue;
-                        scan("频道" + code, "user.php?action=ch_history&code="
+                        scan(ctx, "频道" + code, "user.php?action=ch_history&code="
                                 + Uri.encode(code));
                     }
                 }
@@ -174,7 +221,7 @@ public class MonitorService extends Service {
                         if (o == null) continue;
                         String nm = o.optString("username", "");
                         if (nm.isEmpty()) continue;
-                        scan("与" + nm + "私聊", "user.php?action=pm_history&peer="
+                        scan(ctx, "与" + nm + "私聊", "user.php?action=pm_history&peer="
                                 + Uri.encode(nm));
                     }
                 }
@@ -183,7 +230,7 @@ public class MonitorService extends Service {
     }
 
     /** 拉一次会话，若最后一条比上次看到的新且不是自己发的，就通知 */
-    private void scan(String target, String url) {
+    private static void scan(Context ctx, String target, String url) {
         JSONObject r = Api.get(url);
         if (r == null) return;
         long ts = Notify.lastTs(r);
@@ -202,11 +249,11 @@ public class MonitorService extends Service {
         String me = Prefs.user();
         if (who.isEmpty() || who.equals(me)) return;
         dirty = true;   // 通知界面：回来时做一次全量重载
-        Notify.message(this, target, who + "（" + target + "）",
+        Notify.message(ctx, target, who + "（" + target + "）",
                 last.optString("content", ""));
     }
 
-    private void checkVersion() {
+    private static void checkVersion(final Context ctx) {
         new Thread(new Runnable() {
             public void run() {
                 JSONObject r = Api.get("appapi.php?action=app_update");
@@ -216,10 +263,10 @@ public class MonitorService extends Service {
                 int localCode = 0;
                 String localName = "0";
                 try {
-                    localCode = getPackageManager()
-                            .getPackageInfo(getPackageName(), 0).versionCode;
-                    localName = getPackageManager()
-                            .getPackageInfo(getPackageName(), 0).versionName;
+                    localCode = ctx.getPackageManager()
+                            .getPackageInfo(ctx.getPackageName(), 0).versionCode;
+                    localName = ctx.getPackageManager()
+                            .getPackageInfo(ctx.getPackageName(), 0).versionName;
                 } catch (Exception ignore) {}
                 String shown = Prefs.get("last_update_notified", "");
                 boolean newer = remoteCode > localCode
@@ -227,7 +274,7 @@ public class MonitorService extends Service {
                             && compare(remoteName, localName) > 0);
                 if (!newer || remoteName.equals(shown)) return;
                 Prefs.put("last_update_notified", remoteName);
-                Notify.update(MonitorService.this, remoteName, r.optString("changelog", ""));
+                Notify.update(ctx, remoteName, r.optString("changelog", ""));
             }
         }).start();
     }

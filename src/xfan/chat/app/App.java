@@ -1,13 +1,20 @@
 package xfan.chat.app;
 
 import android.app.Application;
+import android.content.Context;
 
 /** 应用入口（在 AndroidManifest 的 application android:name 里注册）。 */
 public class App extends Application {
 
+    private static Context sCtx;
+
+    /** 全局 Context。Job 拉起的进程里也能拿到，静态方法干活要用。 */
+    public static Context ctx() { return sCtx; }
+
     @Override
     public void onCreate() {
         super.onCreate();
+        sCtx = getApplicationContext();
         try { CrashGuard.install(this); } catch (Throwable ignore) {}
         try { Prefs.init(this); }        catch (Throwable ignore) {}
         // 必须在主线程初始化：ImgLoader 里有 Handler，
@@ -27,5 +34,8 @@ public class App extends Application {
             try { startService(new android.content.Intent(this, MonitorService.class)); }
             catch (Throwable ignore2) {}
         }
+        // 兜底唤醒：进程被杀后由系统周期性重新拉起（约 15 分钟一次），
+        // 这样即使用户没打开 App 也能收到新消息通知。
+        try { MonitorJob.schedule(this); } catch (Throwable ignore) {}
     }
 }

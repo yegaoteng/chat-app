@@ -133,6 +133,9 @@ public class SplashActivity extends Activity {
             startActivity(i);
         } catch (Throwable ignore) {}
         try { finish(); } catch (Throwable ignore) {}
+        try {
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        } catch (Throwable ignore2) {}
         try { overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out); }
         catch (Throwable ignore) {}
     }

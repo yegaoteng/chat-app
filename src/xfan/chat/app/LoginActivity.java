@@ -110,9 +110,10 @@ public class LoginActivity extends Activity {
             public void onClick(View v) {
                 if (!regMode) {
                     regMode = true;
-                    edInvite.setVisibility(View.VISIBLE);
-                    edUid.setVisibility(View.VISIBLE);
-                    tvUidTip.setVisibility(View.VISIBLE);
+                    // 从下往上滑入 + 淡入，逐项错开一点，看起来是「展开」而不是瞬间跳变
+                    reveal(edUid, 0);
+                    reveal(tvUidTip, 60);
+                    reveal(edInvite, 120);
                     btnLogin.setText("已有账号？点此登录");
                     btnRegister.setText("确认注册");
                     tvTip.setText("注册需要邀请码，UID 一经注册不可更改");
@@ -390,12 +391,53 @@ public class LoginActivity extends Activity {
     /** 从注册模式切回登录模式 */
     private void switchToLogin() {
         regMode = false;
-        edInvite.setVisibility(View.GONE);
-        edUid.setVisibility(View.GONE);
-        tvUidTip.setVisibility(View.GONE);
+        hide(edUid, 0);
+        hide(tvUidTip, 40);
+        hide(edInvite, 80);
         btnLogin.setText(R.string.btn_login);
         btnRegister.setText(R.string.btn_register);
         tvTip.setText("");
+    }
+
+    /**
+     * 字段滑入：从下方 24dp 处上移 + 淡入。
+     * 之前是直接 setVisibility(VISIBLE)，切换登录/注册时会突然跳一块出来。
+     */
+    private void reveal(final View v, long delay) {
+        if (v == null || v.getVisibility() == View.VISIBLE) return;
+        v.setVisibility(View.VISIBLE);
+        v.setAlpha(0f);
+        v.setTranslationY(24f * getResources().getDisplayMetrics().density);
+        v.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(delay)
+                .setDuration(260)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator())
+                .setListener(null)
+                .start();
+    }
+
+    /** 字段滑出：上移 + 淡出，动画结束后再 GONE，避免收得太生硬 */
+    private void hide(final View v, long delay) {
+        if (v == null || v.getVisibility() != View.VISIBLE) return;
+        v.animate()
+                .alpha(0f)
+                .translationY(-16f * getResources().getDisplayMetrics().density)
+                .setStartDelay(delay)
+                .setDuration(200)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                .setListener(new android.animation.Animator.AnimatorListener() {
+                    public void onAnimationStart(android.animation.Animator a) {}
+                    public void onAnimationEnd(android.animation.Animator a) {
+                        v.setVisibility(View.GONE);
+                        v.setAlpha(1f);
+                        v.setTranslationY(0f);
+                    }
+                    public void onAnimationCancel(android.animation.Animator a) {}
+                    public void onAnimationRepeat(android.animation.Animator a) {}
+                })
+                .start();
     }
 
     private void doLogin() {
@@ -573,6 +615,11 @@ public class LoginActivity extends Activity {
     private void enterMain() {
         startActivity(new Intent(this, MainActivity.class));
         finish();
+        // 页面切换过渡：登录页淡出，主页淡入。用系统内置动画资源，
+        // 不新增 XML（Fragment 事务里曾用 XML 触发过 AnimatorInflater 报错）。
+        try {
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        } catch (Throwable ignore) {}
     }
 
     /** 忘记密码：没有邮箱/手机验证，只能找站长 */
@@ -589,7 +636,7 @@ public class LoginActivity extends Activity {
                     public void onClick(DialogInterface d, int w) {
                         try {
                             startActivity(new Intent(Intent.ACTION_VIEW,
-                                    Uri.parse("https://xiaof.hyperphp.com/chatapp/")));
+                                    Uri.parse("https://mc.xfan.l.cd")));
                         } catch (Throwable ignore) {
                             Toast.makeText(LoginActivity.this, "无法打开网页", Toast.LENGTH_SHORT).show();
                         }
