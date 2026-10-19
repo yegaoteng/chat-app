@@ -231,7 +231,7 @@ public class FriendsFragment extends Fragment {
 
     private void confirmQuitChannel(final Models.Channel ch) {
         if (getActivity() == null) return;
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle("退出频道")
                 .setMessage("确定退出「" + ch.name + "」吗？退出后需要重新输入频道码才能加入。")
                 .setNegativeButton("我再想想", null)
@@ -432,7 +432,7 @@ public class FriendsFragment extends Fragment {
     }
 
     private void confirmDelete(final Models.Friend f) {
-        AlertDialog dlg = new AlertDialog.Builder(getActivity())
+        AlertDialog dlg = new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle(R.string.fr_del_title)
                 .setMessage(R.string.fr_del_body)
                 .setNegativeButton(R.string.fr_del_think, null)
@@ -500,7 +500,7 @@ public class FriendsFragment extends Fragment {
                             names.add(o.optString("username", ""));
                         }
                         if (names.isEmpty()) { toast("没有可添加的用户"); return; }
-                        new AlertDialog.Builder(getActivity())
+                        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                                 .setTitle("选择用户")
                                 .setItems(names.toArray(new String[0]),
                                         new DialogInterface.OnClickListener() {
@@ -518,7 +518,7 @@ public class FriendsFragment extends Fragment {
         final EditText ed = new EditText(getActivity());
         ed.setHint(R.string.fr_reason_hint);
         ed.setSingleLine(false);
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle("申请添加 " + who)
                 .setView(ed)
                 .setNegativeButton(R.string.btn_cancel, null)
@@ -572,7 +572,7 @@ public class FriendsFragment extends Fragment {
                             list.add(q);
                             labels.add(q.username + "：" + q.reason);
                         }
-                        new AlertDialog.Builder(getActivity())
+                        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                                 .setTitle("好友申请")
                                 .setItems(labels.toArray(new String[0]),
                                         new DialogInterface.OnClickListener() {
@@ -587,7 +587,7 @@ public class FriendsFragment extends Fragment {
     }
 
     private void handleReq(final Models.Req q) {
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle(q.username)
                 .setMessage(q.reason.isEmpty() ? "想添加你为好友" : q.reason)
                 .setNegativeButton("拒绝", new DialogInterface.OnClickListener() {
@@ -622,7 +622,7 @@ public class FriendsFragment extends Fragment {
         final EditText ed = new EditText(getActivity());
         ed.setHint(R.string.ch_code_hint);
         ed.setInputType(InputType.TYPE_CLASS_NUMBER);
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle(R.string.ch_join)
                 .setView(ed)
                 .setNegativeButton(R.string.btn_cancel, null)

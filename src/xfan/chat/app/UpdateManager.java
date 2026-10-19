@@ -115,7 +115,7 @@ public class UpdateManager {
                         if (url.isEmpty()) {
                             // 有新版本但后台没填下载地址：提示但不给按钮
                             if (manual) {
-                                new AlertDialog.Builder(act)
+                                new AlertDialog.Builder(act, R.style.XfanDialog)
                                         .setTitle("发现新版本 " + remoteName)
                                         .setMessage("服务器已发布新版本，但后台未填写下载地址。")
                                         .setPositiveButton("知道了", null)
@@ -141,7 +141,7 @@ public class UpdateManager {
 
     private static void show(final Activity act, String vname, String log, final String url) {
         String msg = (log == null || log.isEmpty()) ? "服务器上有新版本" : log;
-        AlertDialog d = new AlertDialog.Builder(act)
+        AlertDialog d = new AlertDialog.Builder(act, R.style.XfanDialog)
                 .setTitle("发现新版本 " + (vname == null ? "" : vname))
                 .setMessage(msg)
                 .setCancelable(true)

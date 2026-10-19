@@ -21,4 +21,9 @@
     <color name="danger">#E74C3C</color>
     <color name="ok">#2E7D32</color>
     <color name="gold">#E8B923</color>
+    <!-- 弹窗统一配色：灰底 + 深蓝边 -->
+    <color name="dl_bg">#F2F3F5</color>
+    <color name="dl_stroke">#1B3A8C</color>
+    <color name="dl_text">#1B4DB0</color>
+    <color name="sky">#38B6FF</color>
 </resources>

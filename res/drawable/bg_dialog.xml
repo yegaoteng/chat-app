@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 弹窗统一外观：灰色底 + 深蓝边框 + 大圆角 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/dl_bg" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/dl_stroke" />
+    <corners android:radius="18dp" />
+    <padding
+        android:left="12dp"
+        android:top="8dp"
+        android:right="12dp"
+        android:bottom="8dp" />
+</shape>

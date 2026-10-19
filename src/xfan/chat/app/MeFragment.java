@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -113,7 +114,7 @@ public class MeFragment extends Fragment {
         refreshFpsLabel();
         btnLogout.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v2) {
-                new AlertDialog.Builder(getActivity())
+                new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                         .setTitle("退出登录")
                         .setMessage("确定退出吗？")
                         .setNegativeButton(R.string.btn_cancel, null)
@@ -237,11 +238,94 @@ public class MeFragment extends Fragment {
         } catch (Exception ignore) {}
     }
 
+    /** 展开 / 收起「修改个人资料」 */
+    private void toggleProfile() {
+        if (boxProfile == null || btnProfileToggle == null) return;
+        profileOpen = !profileOpen;
+        boxProfile.setVisibility(profileOpen ? View.VISIBLE : View.GONE);
+        btnProfileToggle.setText(profileOpen ? "修改个人资料 ▾" : "修改个人资料 ▸");
+    }
+
+    /** 修改密码：原密码 + 新密码 */
+    private void showChangePassword() {
+        if (getActivity() == null) return;
+        LinearLayout box = new LinearLayout(getActivity());
+        box.setOrientation(LinearLayout.VERTICAL);
+        int p = (int) (16 * getResources().getDisplayMetrics().density + 0.5f);
+        box.setPadding(p, p / 2, p, 0);
+
+        final EditText oldPw = new EditText(getActivity());
+        oldPw.setHint("原密码");
+        oldPw.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        oldPw.setSingleLine(true);
+        final EditText newPw = new EditText(getActivity());
+        newPw.setHint("新密码（至少 4 位）");
+        newPw.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        newPw.setSingleLine(true);
+        final EditText newPw2 = new EditText(getActivity());
+        newPw2.setHint("确认新密码");
+        newPw2.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        newPw2.setSingleLine(true);
+
+        Underline.attach(oldPw);
+        Underline.attach(newPw);
+        Underline.attach(newPw2);
+
+        box.addView(oldPw);
+        box.addView(newPw);
+        box.addView(newPw2);
+
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
+                .setTitle("修改密码")
+                .setView(box)
+                .setNegativeButton(R.string.btn_cancel, null)
+                .setPositiveButton("确认修改", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        String o = oldPw.getText().toString();
+                        String n = newPw.getText().toString();
+                        String n2 = newPw2.getText().toString();
+                        if (o.isEmpty() || n.isEmpty()) { toast("请填写完整"); return; }
+                        if (n.length() < 4) { toast("新密码至少 4 位"); return; }
+                        if (!n.equals(n2)) { toast("两次输入的新密码不一致"); return; }
+                        doChangePassword(o, n);
+                    }
+                })
+                .show();
+    }
+
+    private void doChangePassword(final String oldPw, final String newPw) {
+        toast("提交中…");
+        new Thread(new Runnable() {
+            public void run() {
+                JSONObject b = new JSONObject();
+                try {
+                    b.put("old_password", oldPw);
+                    b.put("new_password", newPw);
+                } catch (Exception ignore) {}
+                final JSONObject r = Api.post("user.php?action=change_password", b);
+                if (getActivity() == null) return;
+                getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (r == null) { toast("网络错误"); return; }
+                        if (!r.optBoolean("success", false)) {
+                            toast(r.optString("error", "修改失败"));
+                            return;
+                        }
+                        toast("密码已修改");
+                    }
+                });
+            }
+        }).start();
+    }
+
     private void editBio() {
         final EditText ed = new EditText(getActivity());
         ed.setText(bio.equals("这个人很懒，没有留下简介") ? "" : bio);
         ed.setSingleLine(false);
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle(R.string.me_bio)
                 .setView(ed)
                 .setNegativeButton(R.string.btn_cancel, null)
@@ -280,7 +364,7 @@ public class MeFragment extends Fragment {
     private void editName() {
         final EditText ed = new EditText(getActivity());
         ed.setHint("2-20 个字符");
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle(R.string.me_rename)
                 .setView(ed)
                 .setMessage("每 7 天只能修改一次")
@@ -522,7 +606,7 @@ public class MeFragment extends Fragment {
                             }
                         }
                         if (urls.isEmpty()) { toast("还没有上传记录"); return; }
-                        new AlertDialog.Builder(getActivity())
+                        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                                 .setTitle("我的上传（点击进入操作）")
                                 .setItems(labels.toArray(new String[0]),
                                         new DialogInterface.OnClickListener() {
@@ -537,7 +621,7 @@ public class MeFragment extends Fragment {
     }
 
     private void uploadMenu(final String url, final String label, final String fileKey) {
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle(label)
                 .setItems(new String[]{"查看大图", "删除并返还积分"},
                         new DialogInterface.OnClickListener() {

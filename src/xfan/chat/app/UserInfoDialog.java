@@ -153,7 +153,7 @@ public class UserInfoDialog {
         box.addView(tvMeta);
         box.addView(tvBio);
 
-        AlertDialog.Builder bld = new AlertDialog.Builder(host.getActivity())
+        AlertDialog.Builder bld = new AlertDialog.Builder(host.getActivity(), R.style.XfanDialog)
                 .setTitle("资料")
                 .setView(box)
                 .setNegativeButton(R.string.btn_close, null);

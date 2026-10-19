@@ -39,6 +39,27 @@ public class MsgMenu {
     }
 
     /**
+     * 按被长按的条目 View 定位。
+     *
+     * 之前只用全局记录的 lastTouchX/Y，第二次长按时常拿到上一次的旧坐标，
+     * 弹窗就出现在上次的位置。用条目自身的位置最可靠 ——
+     * 它天然就是「这次长按的那一条」，不存在复用旧值的问题。
+     */
+    public static void showAt(Context ctx, View anchor, View item,
+                              List<String> acts, boolean muted, boolean showMute,
+                              final Callback cb) {
+        if (ctx == null || anchor == null) return;
+        if (item != null) {
+            float cx = item.getLeft() + item.getWidth() / 2f;
+            float cy = item.getTop() + item.getHeight() / 2f;
+            show(ctx, anchor, cx, cy, acts, muted, showMute, cb);
+            return;
+        }
+        show(ctx, anchor, anchor.getWidth() / 2f, anchor.getHeight() / 2f,
+                acts, muted, showMute, cb);
+    }
+
+    /**
      * @param showMute 是否显示免打扰开关。消息栏长按传 false。
      */
     public static void show(Context ctx, View anchor, float x, float y,
@@ -52,19 +73,19 @@ public class MsgMenu {
         box.setPadding(pad, pad, pad, pad);
 
         GradientDrawable gd = new GradientDrawable();
-        gd.setColor(0xF21B1B28);
+        gd.setColor(0xFFF2F3F5);          // 灰底
         gd.setCornerRadius(Ui.R);
-        gd.setStroke(2, 0x99FFFFFF);
+        gd.setStroke(2, 0xFF1B3A8C);      // 深蓝边
         box.setBackgroundDrawable(gd);
 
         // 免打扰开关：接收消息，但不在通知中心弹（仅好友 / 频道页显示）
         if (showMute) {
             final Switch sw = new Switch(ctx);
             sw.setText("免打扰");
-            sw.setTextColor(0xFFFFFFFF);
+            sw.setTextColor(0xFF1B4DB0);
             sw.setChecked(muted);
             sw.setPadding(pad, pad, pad, pad);
-            sw.setBackgroundDrawable(Ui.border(0x33FFFFFF, 0x99FFFFFF, Ui.R));
+            sw.setBackgroundDrawable(Ui.border(0xFFF2F3F5, 0xFF1B3A8C, Ui.R));
             sw.setOnCheckedChangeListener(
                     new android.widget.CompoundButton.OnCheckedChangeListener() {
                         public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
@@ -80,11 +101,11 @@ public class MsgMenu {
             final String a = acts.get(i);
             TextView t = new TextView(ctx);
             t.setText(a);
-            t.setTextColor(0xFFFFFFFF);
+            t.setTextColor(0xFF1B4DB0);
             t.setTextSize(15);
             t.setGravity(Gravity.CENTER_VERTICAL);
             t.setPadding(pad * 2, pad, pad * 2, pad);
-            t.setBackgroundDrawable(Ui.border(0x33FFFFFF, 0x99FFFFFF, Ui.R));
+            t.setBackgroundDrawable(Ui.border(0xFFF2F3F5, 0xFF1B3A8C, Ui.R));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT);

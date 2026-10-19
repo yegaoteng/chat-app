@@ -28,9 +28,9 @@ public final class Ui {
         return gd;
     }
 
-    /** 给单个 View 加圆角边框 */
+    /** 给单个 View 加圆角边框：统一灰底 + 深蓝边 */
     public static void outline(View v) {
-        outline(v, 0x33FFFFFF, 0x99FFFFFF);
+        outline(v, 0xFFF2F3F5, 0xFF1B3A8C);
     }
 
     public static void outline(View v, int fill, int stroke) {
@@ -67,7 +67,7 @@ public final class Ui {
                         : d.getWindow().findViewById(android.R.id.button1 + (w + 1));
                 if (v != null) {
                     // 只换背景，不动 padding：改 padding 会触发整个窗口 relayout，弹窗会闪一下
-                    outline(v, 0x00000000, 0x99FFFFFF);
+                    outline(v, 0xFFF2F3F5, 0xFF1B3A8C);
                 }
             }
         } catch (Throwable ignore) {}

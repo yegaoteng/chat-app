@@ -27,9 +27,9 @@ public class MsgAdapter extends BaseAdapter {
         void onImage(String content);
     }
 
-    /** 长按回调。 */
+    /** 长按回调。带上被长按的 View，供菜单定位。 */
     public interface OnItemLongClick {
-        void onLongClick(int pos);
+        void onLongClick(int pos, View v);
     }
 
     /** 点击头像 -> 查看该用户资料 */
@@ -130,7 +130,7 @@ public class MsgAdapter extends BaseAdapter {
             // 文本消息：整行都要能长按（含引用块）
             View.OnLongClickListener ol2 = new View.OnLongClickListener() {
                 public boolean onLongClick(View v) {
-                    if (longClick != null) { longClick.onLongClick(pos); return true; }
+                    if (longClick != null) { longClick.onLongClick(pos, v); return true; }
                     return false;
                 }
             };
@@ -231,7 +231,7 @@ public class MsgAdapter extends BaseAdapter {
         // 长按：图片可点击后 ListView 的条目长按收不到，这里自己转发
         View.OnLongClickListener ol = new View.OnLongClickListener() {
             public boolean onLongClick(View v) {
-                if (longClick != null) { longClick.onLongClick(myPos); return true; }
+                if (longClick != null) { longClick.onLongClick(myPos, v); return true; }
                 return false;
             }
         };

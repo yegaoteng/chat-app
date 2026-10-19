@@ -77,6 +77,8 @@ public class ChatFragment extends Fragment {
 
     /** 最近一次长按的坐标，供菜单定位 */
     private float lastTouchX = 0f, lastTouchY = 0f;
+    /** 本次长按的那一条，用于菜单定位 */
+    private View lastAnchorItem = null;
 
     /** 当前正在引用的消息 */
     private Models.Msg quoting = null;
@@ -116,8 +118,10 @@ public class ChatFragment extends Fragment {
         });
         // 图片消息的长按由 adapter 转发（图片可点击后 ListView 收不到长按）
         ad.setOnItemLongClick(new MsgAdapter.OnItemLongClick() {
-            public void onLongClick(int pos) {
+            public void onLongClick(int pos, View v) {
                 if (pos < 0 || pos >= data.size()) return;
+                // 图片/气泡转发来的长按同样用这一条定位
+                lastAnchorItem = (v != null) ? v : lv;
                 showMsgMenu(data.get(pos));
             }
         });
@@ -143,6 +147,7 @@ public class ChatFragment extends Fragment {
         lv.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             public boolean onItemLongClick(AdapterView<?> p, View v2, int pos, long id) {
                 if (pos < 0 || pos >= data.size()) return true;
+                lastAnchorItem = v2;   // 用这一条本身定位，避免复用上次坐标
                 showMsgMenu(data.get(pos));
                 return true;
             }
@@ -548,7 +553,7 @@ public class ChatFragment extends Fragment {
         box.addView(tvPts);
         box.addView(tvRule);
 
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle("发送图片")
                 .setView(box)
                 .setNegativeButton(R.string.btn_close, null)
@@ -624,7 +629,7 @@ public class ChatFragment extends Fragment {
         sb.append("删除可返还：").append(refund).append(" 分（50%）");
         if (points >= 0) sb.append("\n\n当前积分：").append(points).append(" 分");
 
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle("确认上传")
                 .setMessage(sb.toString())
                 .setNegativeButton("取消", null)
@@ -862,7 +867,7 @@ public class ChatFragment extends Fragment {
                             box.addView(row);
                         }
                         sv.addView(box);
-                        AlertDialog dlg = new AlertDialog.Builder(getActivity())
+                        AlertDialog dlg = new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                                 .setTitle("我的上传")
                                 .setView(sv)
                                 .setNegativeButton(R.string.btn_close, null)
@@ -908,7 +913,7 @@ public class ChatFragment extends Fragment {
     /** 删除上传：返还该图片 50% 积分。用 key 精确定位，避免删错同名图 */
     private void confirmDeleteUpload(final String name, final String key) {
         if (getActivity() == null) return;
-        new AlertDialog.Builder(getActivity())
+        new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle("删除这张图片？")
                 .setMessage(name + "\n删除后将返还该图片消耗的 50% 积分，且无法恢复。")
                 .setNegativeButton("我再想想", null)
@@ -974,7 +979,7 @@ public class ChatFragment extends Fragment {
         View anchor = (lv != null) ? lv : getActivity().findViewById(android.R.id.content);
         final String target = bgTarget();
         // 消息栏长按不显示免打扰：那是好友 / 频道页的设置项
-        MsgMenu.show(getActivity(), anchor, lastTouchX, lastTouchY, acts,
+        MsgMenu.showAt(getActivity(), anchor, lastAnchorItem, acts,
                 false, false, new MsgMenu.Callback() {
                     public void onAction(String a) {
                         if ("__mute_on".equals(a)) {

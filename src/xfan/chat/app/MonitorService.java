@@ -52,12 +52,66 @@ public class MonitorService extends Service {
         super.onCreate();
         Api.bindContext(this);
         Api.applyHttpSwitch();
-        h.postDelayed(tick, 5000);
+        // 必须前台化：普通后台 Service 在国产 ROM（vivo/小米等）上
+        // 几分钟内就会被回收，表现为「挂后台收不到通知」。
+        // 前台服务会常驻一条低优先级通知，系统不会轻易杀。
+        try { startForeground(7788, ongoing()); } catch (Throwable ignore) {}
+        h.postDelayed(tick, 3000);
+    }
+
+    /** 常驻通知：重要性设为 LOW，不响铃不震动，只在通知栏安静显示 */
+    private android.app.Notification ongoing() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                android.app.NotificationChannel ch = new android.app.NotificationChannel(
+                        "xfan_keep", "后台运行",
+                        android.app.NotificationManager.IMPORTANCE_LOW);
+                ch.setShowBadge(false);
+                android.app.NotificationManager m =
+                        (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                if (m != null) m.createNotificationChannel(ch);
+            }
+            android.app.Notification.Builder b =
+                    new android.app.Notification.Builder(this)
+                            .setSmallIcon(android.R.drawable.stat_notify_chat)
+                            .setContentTitle("xfan chat 正在后台运行")
+                            .setContentText("有新的频道或私聊消息时会通知你")
+                            .setOngoing(true);
+            if (android.os.Build.VERSION.SDK_INT >= 26) b.setChannelId("xfan_keep");
+            try {
+                b.setContentIntent(android.app.PendingIntent.getActivity(this, 2,
+                        new Intent(this, MainActivity.class)
+                                .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                        android.os.Build.VERSION.SDK_INT >= 23
+                                ? android.app.PendingIntent.FLAG_IMMUTABLE
+                                        | android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                                : android.app.PendingIntent.FLAG_UPDATE_CURRENT));
+            } catch (Throwable ignore) {}
+            return b.build();
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override
     public int onStartCommand(Intent i, int flags, int startId) {
+        // 进程被杀后系统会用 null intent 重建，前台标记要重新打一次
+        try { startForeground(7788, ongoing()); } catch (Throwable ignore) {}
         return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // 用户划掉后台卡片后自动重启，避免彻底收不到消息
+        try {
+            Intent i = new Intent(this, MonitorService.class);
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                startForegroundService(i);
+            } else {
+                startService(i);
+            }
+        } catch (Throwable ignore) {}
+        super.onTaskRemoved(rootIntent);
     }
 
     @Override

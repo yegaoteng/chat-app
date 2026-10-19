@@ -180,6 +180,18 @@
             android:textColor="@color/text_sub"
             android:textSize="14sp" />
 
+        <!-- 忘记密码：注册按钮下方 -->
+        <TextView
+            android:id="@+id/btnForgot"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_gravity="center_horizontal"
+            android:padding="8dp"
+            android:text="忘记密码？"
+            android:textColor="@color/sky"
+            android:textSize="13sp" />
+
         <TextView
             android:id="@+id/tvTip"
             android:layout_width="wrap_content"

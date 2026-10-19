@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 弹窗按钮：深蓝边框 + 灰底（按下时略深） -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#E4E6EA" />
+            <stroke android:width="1.5dp" android:color="@color/dl_stroke" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/dl_bg" />
+            <stroke android:width="1.5dp" android:color="@color/dl_stroke" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
+</selector>

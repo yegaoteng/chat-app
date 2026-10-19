@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 仅用于 View.setTag 的占位 id，不参与布局 -->
+<resources>
+    <item name="tag_ul_anim" type="id" />
+</resources>

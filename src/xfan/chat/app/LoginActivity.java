@@ -1,5 +1,8 @@
 package xfan.chat.app;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
@@ -17,6 +20,7 @@ import org.json.JSONObject;
 public class LoginActivity extends Activity {
 
     private EditText edUser, edPass, edInvite, edUid;
+    private TextView btnForgot;
     private TextView tvUidTip;
     private Button btnLogin, btnRegister, btnWeb;
     private TextView tvTip, tvTitle, tvCaret, tvLogging;
@@ -50,7 +54,14 @@ public class LoginActivity extends Activity {
         btnRegister = findViewById(R.id.btnRegister);
         tvTip    = findViewById(R.id.tvTip);
 
+        // 输入框下划线：未选中黑线，聚焦时天蓝线从中心展开
+        Underline.attach(edUser);
+        Underline.attach(edPass);
+        Underline.attach(edInvite);
+        Underline.attach(edUid);
+
         btnWeb = findViewById(R.id.btnWeb);
+        btnForgot = findViewById(R.id.btnForgot);
 
         tvTitle  = findViewById(R.id.tvTitle);
         tvCaret  = findViewById(R.id.tvCaret);
@@ -59,6 +70,11 @@ public class LoginActivity extends Activity {
         boxLogin = findViewById(R.id.boxLogin);
         startTypewriter();
         setupVideoBg();
+        if (btnForgot != null) {
+            btnForgot.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { showForgotDialog(); }
+            });
+        }
 
         String u = Prefs.user();
         if (u != null && !u.isEmpty()) edUser.setText(u);
@@ -509,6 +525,30 @@ public class LoginActivity extends Activity {
     private void enterMain() {
         startActivity(new Intent(this, MainActivity.class));
         finish();
+    }
+
+    /** 忘记密码：没有邮箱/手机验证，只能找站长 */
+    private void showForgotDialog() {
+        String msg = "请联系站长更改密码：\n\n"
+                + "1. 在 mc.xfan.l.cd 新建一个账号\n"
+                + "2. 在反馈页提交反馈，带上你的用户名\n\n"
+                + "站长会在 48 小时内回应你。";
+        new AlertDialog.Builder(this, R.style.XfanDialog)
+                .setTitle("忘记密码？")
+                .setMessage(msg)
+                .setNegativeButton("我知道了", null)
+                .setPositiveButton("复制地址", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        try {
+                            android.content.ClipboardManager cm =
+                                    (android.content.ClipboardManager)
+                                            getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                            cm.setText("mc.xfan.l.cd");
+                            Toast.makeText(LoginActivity.this, "已复制", Toast.LENGTH_SHORT).show();
+                        } catch (Throwable ignore) {}
+                    }
+                })
+                .show();
     }
 
     private void showLastCrash() {

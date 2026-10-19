@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  输入框下划线：
+    未选中 -> 黑色横线
+    选中   -> 天蓝色横线从中心展开覆盖黑色
+  用两个 item 叠加：底层黑线常驻，上层蓝线用 scale 从中心放大。
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 底层：未选中的黑线 -->
+    <item android:gravity="bottom">
+        <shape android:shape="rectangle">
+            <size android:height="2dp" />
+            <solid android:color="#FF000000" />
+        </shape>
+    </item>
+    <!-- 上层：选中时从中心展开的天蓝线 -->
+    <item android:gravity="bottom" android:id="@+id/line">
+        <scale
+            android:scaleWidth="100%"
+            android:scaleGravity="center"
+            android:drawable="@drawable/line_sky" />
+    </item>
+</layer-list>

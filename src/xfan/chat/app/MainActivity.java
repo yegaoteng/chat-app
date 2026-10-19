@@ -897,7 +897,7 @@ public class MainActivity extends Activity {
 
     private void setStyle(final String kind, final String key, final boolean has, final int price) {
         if (!has && price > 0) {
-            new AlertDialog.Builder(this)
+            new AlertDialog.Builder(this, R.style.XfanDialog)
                     .setTitle("解锁")
                     .setMessage("解锁需要 " + price + " 积分，确定吗？")
                     .setPositiveButton("解锁", new DialogInterface.OnClickListener() {

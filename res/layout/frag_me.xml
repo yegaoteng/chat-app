@@ -99,35 +99,64 @@
             android:textColor="@color/text"
             android:textSize="14sp" />
 
+        <!-- 修改个人资料：折叠栏，点标题展开里面的更改项 -->
         <Button
-            android:id="@+id/btnBio"
+            android:id="@+id/btnProfileToggle"
             android:layout_width="match_parent"
             android:layout_height="44dp"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_card"
-            android:text="@string/me_bio"
+            android:text="修改个人资料"
             android:textColor="@color/text"
             android:textSize="14sp" />
 
-        <Button
-            android:id="@+id/btnRename"
+        <LinearLayout
+            android:id="@+id/boxProfile"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_card"
-            android:text="@string/me_rename"
-            android:textColor="@color/text"
-            android:textSize="14sp" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical"
+            android:visibility="gone">
 
-        <Button
-            android:id="@+id/btnAvatar"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_card"
-            android:text="更换头像"
-            android:textColor="@color/text"
-            android:textSize="14sp" />
+            <Button
+                android:id="@+id/btnBio"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_card"
+                android:text="@string/me_bio"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnRename"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_card"
+                android:text="@string/me_rename"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnAvatar"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_card"
+                android:text="更换头像"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btnPassword"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/bg_card"
+                android:text="修改密码"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+        </LinearLayout>
 
         <!-- 更换头像下方：显示设置（帧率） -->
         <Button

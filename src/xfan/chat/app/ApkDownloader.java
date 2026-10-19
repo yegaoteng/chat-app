@@ -46,6 +46,10 @@ public class ApkDownloader {
                     public void onClick(DialogInterface d, int w) { cancel = true; }
                 });
         pd.show();
+        // 水平进度条改天蓝色（必须在 show 之后设置才生效）
+        try {
+            pd.setProgressDrawable(act.getResources().getDrawable(R.drawable.pb_sky));
+        } catch (Throwable ignore) {}
 
         cancel = false;
 
@@ -152,7 +156,7 @@ public class ApkDownloader {
         h.post(new Runnable() {
             public void run() {
                 try { pd.dismiss(); } catch (Throwable ignore) {}
-                new AlertDialog.Builder(act)
+                new AlertDialog.Builder(act, R.style.XfanDialog)
                         .setTitle("下载失败")
                         .setMessage(msg + "\n\n也可以稍后在「我的 → 检查更新」里重试。")
                         .setPositiveButton("知道了", null)
@@ -176,7 +180,7 @@ public class ApkDownloader {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             act.startActivity(i);
         } catch (Throwable t) {
-            new AlertDialog.Builder(act)
+            new AlertDialog.Builder(act, R.style.XfanDialog)
                     .setTitle("下载完成")
                     .setMessage("已下载到：\n" + f.getAbsolutePath()
                             + "\n\n自动安装失败，请手动打开该文件安装。")
