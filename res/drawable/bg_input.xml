@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 输入框底色：下划线由 Underline 动态绘制，这里只留透明底 -->
+<!-- 输入框：圆角灰底边框（登录页沿用原样式） -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#00000000" />
+    <solid android:color="#1AFFFFFF" />
+    <stroke
+        android:width="1dp"
+        android:color="#40FFFFFF" />
+    <corners android:radius="10dp" />
 </shape>

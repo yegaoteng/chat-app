@@ -25,6 +25,19 @@ import java.util.Map;
 public class MonitorService extends Service {
 
     private static final long MSG_EVERY = 20_000L;
+
+    /**
+     * 后台期间来过新消息。
+     * 界面回到前台时读一次并清零，触发全量重载 ——
+     * 否则只看增量可能漏消息，表现为「不打开 App 就收不到」。
+     */
+    private static volatile boolean dirty = false;
+
+    public static boolean consumeDirty() {
+        boolean d = dirty;
+        dirty = false;
+        return d;
+    }
     private static final long VER_EVERY = 3_600_000L;
 
     private final Handler h = new Handler(Looper.getMainLooper());
@@ -188,6 +201,7 @@ public class MonitorService extends Service {
         String who = last.optString("username", "");
         String me = Prefs.user();
         if (who.isEmpty() || who.equals(me)) return;
+        dirty = true;   // 通知界面：回来时做一次全量重载
         Notify.message(this, target, who + "（" + target + "）",
                 last.optString("content", ""));
     }

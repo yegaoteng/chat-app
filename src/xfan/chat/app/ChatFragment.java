@@ -211,19 +211,32 @@ public class ChatFragment extends Fragment {
         applyTheme();
         startPoll();
         loadOnline();
+        // 后台期间来过新消息就全量重载，避免只靠增量漏消息
+        if (MonitorService.consumeDirty()) loadHistory();
     }
 
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
         visible = !hidden;
-        if (hidden) stopPoll(); else { startPoll(); loadOnline(); }
+        if (hidden) {
+            stopPoll();
+        } else {
+            startPoll();
+            loadOnline();
+            if (MonitorService.consumeDirty()) loadHistory();
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (!isHidden()) { visible = true; startPoll(); }
+        if (!isHidden()) {
+            visible = true;
+            startPoll();
+            // 从后台回来：若期间有新消息则全量重载一次，保证一定看得到
+            if (MonitorService.consumeDirty()) loadHistory();
+        }
     }
 
     @Override
@@ -925,6 +938,12 @@ public class ChatFragment extends Fragment {
 
     private void doDeleteUpload(final String key, final String name) {
         toast("删除中…");
+        // 立刻标记为失效：这样即使重载还没回来，滑动也不会再闪「图片加载中」
+        for (Models.Msg m : data) {
+            if ("image".equals(m.type) && m.content != null && !m.content.isEmpty()) {
+                MsgAdapter.markDead(m.content);
+            }
+        }
         new Thread(new Runnable() {
             public void run() {
                 JSONObject b = new JSONObject();

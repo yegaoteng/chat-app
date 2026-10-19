@@ -63,7 +63,7 @@
     <string name="msg_net_error">网络错误</string>
     <string name="msg_loading">加载中…</string>
     <string name="hint_uid">用户 UID（3-20 位英文或数字）</string>
-    <string name="uid_warn">UID 注册后不可更改（仅管理员可在后台修改），请慎重填写。</string>
+    <string name="uid_warn">UID 注册后不可更改，请慎重填写。</string>
     <string name="uid_confirm_title">UID 不可更改</string>
     <string name="uid_invalid">UID 只能包含英文和数字，长度 3-20 位</string>
     <string name="uid_think_again">我再想想</string>

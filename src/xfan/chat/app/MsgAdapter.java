@@ -18,6 +18,19 @@ import java.util.List;
 
 public class MsgAdapter extends BaseAdapter {
 
+    /** 已确认失效（被删除）的图片 url。记下来避免 ListView 复用时反复显示「加载中」。 */
+    private static final java.util.Set<String> dead =
+            java.util.Collections.synchronizedSet(new java.util.HashSet<String>());
+
+    /** 图片被删除后调用：立刻标记为失效，滑动不再闪「加载中」 */
+    public static void markDead(String url) {
+        if (url == null || url.isEmpty()) return;
+        dead.add(Api.absUrl(url));
+    }
+
+    /** 重新上传了同一张图（同名）时取消标记 */
+    public static void clearDead() { dead.clear(); }
+
     private final Context ctx;
     private final List<Models.Msg> data;
     private final LayoutInflater inf;
@@ -116,12 +129,22 @@ public class MsgAdapter extends BaseAdapter {
         // ---- 内容：文本 / 图片 ----
         if ("image".equals(m.type)) {
             vh.body.setVisibility(View.GONE);
-            vh.img.setVisibility(View.GONE);
-            vh.imgLoading.setVisibility(View.VISIBLE);
-            vh.imgLoading.setText("图片加载中…");
-            vh.imgLoading.setTextColor(ThemeEngine.themeTextSub());
             vh.img.setImageDrawable(null);
-            loadImg(vh, m.content);
+            String u0 = Api.absUrl(m.content);
+            // 这张图已确认失效（被删除）-> 直接显示删除态。
+            // 之前每次复用都先显示「图片加载中…」，滑动时会闪一下。
+            if (!u0.isEmpty() && dead.contains(u0)) {
+                vh.img.setVisibility(View.GONE);
+                vh.imgLoading.setVisibility(View.VISIBLE);
+                vh.imgLoading.setText("图片已被删除");
+                vh.imgLoading.setTextColor(0xFF9E9E9E);
+            } else {
+                vh.img.setVisibility(View.GONE);
+                vh.imgLoading.setVisibility(View.VISIBLE);
+                vh.imgLoading.setText("图片加载中…");
+                vh.imgLoading.setTextColor(ThemeEngine.themeTextSub());
+                loadImg(vh, m.content);
+            }
         } else {
             vh.img.setVisibility(View.GONE);
             vh.imgLoading.setVisibility(View.GONE);
@@ -180,6 +203,13 @@ public class MsgAdapter extends BaseAdapter {
     private void loadImg(final ViewHolder vh, final String content) {
         final String url = Api.absUrl(content);
         if (url.isEmpty()) { vh.imgLoading.setVisibility(View.GONE); return; }
+        if (dead.contains(url)) {
+            vh.img.setVisibility(View.GONE);
+            vh.imgLoading.setVisibility(View.VISIBLE);
+            vh.imgLoading.setText("图片已被删除");
+            vh.imgLoading.setTextColor(0xFF9E9E9E);
+            return;
+        }
 
         Bitmap cached = ImgLoader.cached(url, THUMB_W, THUMB_W);
         if (cached != null) {
@@ -210,6 +240,7 @@ public class MsgAdapter extends BaseAdapter {
                             vh.img.setVisibility(View.VISIBLE);
                             bindImageClick(vh, content);
                         } else {
+                            dead.add(url);   // 记住这张图已失效，复用时不再闪「加载中」
                             vh.img.setVisibility(View.GONE);
                             vh.imgLoading.setVisibility(View.VISIBLE);
                             vh.imgLoading.setText("图片已被删除");

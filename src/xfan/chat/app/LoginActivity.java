@@ -5,6 +5,7 @@ import android.content.DialogInterface;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
@@ -21,6 +22,8 @@ public class LoginActivity extends Activity {
 
     private EditText edUser, edPass, edInvite, edUid;
     private TextView btnForgot;
+    /** 视频背景播放位置，用于切后台回来续播 */
+    private int videoPos = 0;
     private TextView tvUidTip;
     private Button btnLogin, btnRegister, btnWeb;
     private TextView tvTip, tvTitle, tvCaret, tvLogging;
@@ -53,12 +56,6 @@ public class LoginActivity extends Activity {
         btnLogin = findViewById(R.id.btnLogin);
         btnRegister = findViewById(R.id.btnRegister);
         tvTip    = findViewById(R.id.tvTip);
-
-        // 输入框下划线：未选中黑线，聚焦时天蓝线从中心展开
-        Underline.attach(edUser);
-        Underline.attach(edPass);
-        Underline.attach(edInvite);
-        Underline.attach(edUid);
 
         btnWeb = findViewById(R.id.btnWeb);
         btnForgot = findViewById(R.id.btnForgot);
@@ -101,7 +98,12 @@ public class LoginActivity extends Activity {
         });
 
         btnLogin.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { doLogin(); }
+            public void onClick(View v) {
+                // 注册模式下该按钮是「已有账号？点此登录」，应切回登录模式。
+                // 之前它仍走 doLogin()，于是先校验输入并弹「请填写密码」。
+                if (regMode) { switchToLogin(); return; }
+                doLogin();
+            }
         });
 
         btnRegister.setOnClickListener(new View.OnClickListener() {
@@ -123,13 +125,7 @@ public class LoginActivity extends Activity {
         btnLogin.setOnLongClickListener(new View.OnLongClickListener() {
             public boolean onLongClick(View v) {
                 if (regMode) {
-                    regMode = false;
-                    edInvite.setVisibility(View.GONE);
-                    edUid.setVisibility(View.GONE);
-                    tvUidTip.setVisibility(View.GONE);
-                    btnLogin.setText(R.string.btn_login);
-                    btnRegister.setText(R.string.btn_register);
-                    tvTip.setText("");
+                    switchToLogin();
                     return true;
                 }
                 return false;
@@ -212,7 +208,13 @@ public class LoginActivity extends Activity {
                     // 居中裁切铺满
                     mp.setVideoScalingMode(
                             android.media.MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
-                    mp.setVolume(0f, 0f);   // 静音
+                    // 按需求开启声音（0f 是静音）
+                    try { mp.setVolume(1f, 1f); } catch (Throwable ignore) {}
+                    // 从后台回来时接着上次的位置播，不要重头开始
+                    int pos = videoPos;
+                    if (pos > 0) {
+                        try { vv.seekTo(pos); } catch (Throwable ignore) {}
+                    }
                     vv.start();
                 }
             });
@@ -228,6 +230,41 @@ public class LoginActivity extends Activity {
             vv.setVisibility(View.GONE);
             if (mask != null) mask.setVisibility(View.GONE);
         }
+    }
+
+    /**
+     * 切后台时记下播放位置，回来时 seek 回去。
+     * 之前没有做这件事，VideoView 在 onResume 会重新 prepare 并从 0 开始，
+     * 于是「滑后台再点进来视频就重播」。
+     */
+    @Override
+    protected void onPause() {
+        try {
+            VideoView vv = findViewById(R.id.videoBg);
+            if (vv != null && vv.isPlaying()) videoPos = vv.getCurrentPosition();
+        } catch (Throwable ignore) {}
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 已经创建过视频就只 seek，不重新 prepare
+        if (videoPos > 0) {
+            try {
+                VideoView vv = findViewById(R.id.videoBg);
+                if (vv != null) {
+                    vv.seekTo(videoPos);
+                    if (!vv.isPlaying()) vv.start();
+                }
+            } catch (Throwable ignore) {}
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { videoPos = 0; } catch (Throwable ignore) {}
+        super.onDestroy();
     }
 
     /** 收起输入法 */
@@ -350,6 +387,17 @@ public class LoginActivity extends Activity {
         return true;
     }
 
+    /** 从注册模式切回登录模式 */
+    private void switchToLogin() {
+        regMode = false;
+        edInvite.setVisibility(View.GONE);
+        edUid.setVisibility(View.GONE);
+        tvUidTip.setVisibility(View.GONE);
+        btnLogin.setText(R.string.btn_login);
+        btnRegister.setText(R.string.btn_register);
+        tvTip.setText("");
+    }
+
     private void doLogin() {
         if (!checkInput()) return;
         final String u = edUser.getText().toString().trim();
@@ -414,7 +462,7 @@ public class LoginActivity extends Activity {
                             final String p, final String inv) {
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.uid_confirm_title)
-                .setMessage("你的 UID 将是「" + uid + "」，注册后不可更改（仅管理员可在后台修改）。\n\n确定使用这个 UID 吗？")
+                .setMessage("你的 UID 将是「" + uid + "」，注册后不可更改。\n\n确定使用这个 UID 吗？")
                 .setNegativeButton(R.string.uid_think_again, null)
                 .setPositiveButton(R.string.uid_confirm_use,
                         new android.content.DialogInterface.OnClickListener() {
@@ -537,15 +585,14 @@ public class LoginActivity extends Activity {
                 .setTitle("忘记密码？")
                 .setMessage(msg)
                 .setNegativeButton("我知道了", null)
-                .setPositiveButton("复制地址", new DialogInterface.OnClickListener() {
+                .setPositiveButton("打开官网", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         try {
-                            android.content.ClipboardManager cm =
-                                    (android.content.ClipboardManager)
-                                            getSystemService(android.content.Context.CLIPBOARD_SERVICE);
-                            cm.setText("mc.xfan.l.cd");
-                            Toast.makeText(LoginActivity.this, "已复制", Toast.LENGTH_SHORT).show();
-                        } catch (Throwable ignore) {}
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                    Uri.parse("https://xiaof.hyperphp.com/chatapp/")));
+                        } catch (Throwable ignore) {
+                            Toast.makeText(LoginActivity.this, "无法打开网页", Toast.LENGTH_SHORT).show();
+                        }
                     }
                 })
                 .show();

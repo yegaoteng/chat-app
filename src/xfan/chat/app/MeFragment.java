@@ -32,6 +32,7 @@ public class MeFragment extends Fragment {
     private Button btnProfileToggle, btnPassword;
     private LinearLayout boxProfile;
     private boolean profileOpen = false;
+    private boolean animating = false;
     private ProgressBar pbUpdate;
     private android.widget.ProgressBar pbSign;
     private String inviteCode = "";
@@ -254,12 +255,56 @@ public class MeFragment extends Fragment {
         } catch (Exception ignore) {}
     }
 
-    /** 展开 / 收起「修改个人资料」 */
+    /** 展开 / 收起「修改个人资料」，带高度过渡动画 */
     private void toggleProfile() {
         if (boxProfile == null || btnProfileToggle == null) return;
         profileOpen = !profileOpen;
-        boxProfile.setVisibility(profileOpen ? View.VISIBLE : View.GONE);
         btnProfileToggle.setText(profileOpen ? "修改个人资料 ▾" : "修改个人资料 ▸");
+
+        // 动画期间禁止重复触发，否则高度测量会乱
+        if (animating) return;
+        animating = true;
+
+        // 先量出目标高度（此时高度为 0，需要先设置成 WRAP_CONTENT 量一次）
+        boxProfile.setVisibility(View.VISIBLE);
+        boxProfile.measure(
+                View.MeasureSpec.makeMeasureSpec(
+                        ((View) boxProfile.getParent()).getWidth(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        final int target = boxProfile.getMeasuredHeight();
+        final int start = profileOpen ? 0 : target;
+        final int end = profileOpen ? target : 0;
+
+        android.animation.ValueAnimator va =
+                android.animation.ValueAnimator.ofInt(start, end);
+        va.setDuration(260);
+        va.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        va.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
+            public void onAnimationUpdate(android.animation.ValueAnimator a) {
+                int v = (Integer) a.getAnimatedValue();
+                android.view.ViewGroup.LayoutParams lp = boxProfile.getLayoutParams();
+                if (lp == null) return;
+                lp.height = v;
+                boxProfile.setLayoutParams(lp);
+            }
+        });
+        va.addListener(new android.animation.Animator.AnimatorListener() {
+            public void onAnimationStart(android.animation.Animator a) {}
+            public void onAnimationEnd(android.animation.Animator a) {
+                animating = false;
+                if (!profileOpen) boxProfile.setVisibility(View.GONE);
+                android.view.ViewGroup.LayoutParams lp = boxProfile.getLayoutParams();
+                if (lp != null) {
+                    lp.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+                    boxProfile.setLayoutParams(lp);
+                }
+            }
+            public void onAnimationCancel(android.animation.Animator a) {
+                animating = false;
+            }
+            public void onAnimationRepeat(android.animation.Animator a) {}
+        });
+        try { va.start(); } catch (Throwable t) { animating = false; }
     }
 
     /** 修改密码：原密码 + 新密码 */
@@ -270,29 +315,18 @@ public class MeFragment extends Fragment {
         int p = (int) (16 * getResources().getDisplayMetrics().density + 0.5f);
         box.setPadding(p, p / 2, p, 0);
 
-        final EditText oldPw = new EditText(getActivity());
-        oldPw.setHint("原密码");
-        oldPw.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        oldPw.setSingleLine(true);
-        final EditText newPw = new EditText(getActivity());
-        newPw.setHint("新密码（至少 4 位）");
-        newPw.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        newPw.setSingleLine(true);
-        final EditText newPw2 = new EditText(getActivity());
-        newPw2.setHint("确认新密码");
-        newPw2.setInputType(android.text.InputType.TYPE_CLASS_TEXT
-                | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        newPw2.setSingleLine(true);
+        int gap = (int) (6 * getResources().getDisplayMetrics().density + 0.5f);
+        final EditText oldPw = field("原密码", true);
+        final EditText newPw = field("新密码（至少 4 位）", true);
+        final EditText newPw2 = field("确认新密码", true);
 
-        Underline.attach(oldPw);
-        Underline.attach(newPw);
-        Underline.attach(newPw2);
-
-        box.addView(oldPw);
-        box.addView(newPw);
-        box.addView(newPw2);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = gap;
+        box.addView(oldPw, lp);
+        box.addView(newPw, lp);
+        box.addView(newPw2, lp);
 
         new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
                 .setTitle("修改密码")
@@ -310,6 +344,23 @@ public class MeFragment extends Fragment {
                     }
                 })
                 .show();
+    }
+
+    /** 弹窗里的输入框：带下划线（未选中黑线，聚焦时天蓝线从中心展开） */
+    private EditText field(String hint, boolean password) {
+        EditText et = new EditText(getActivity());
+        et.setHint(hint);
+        et.setHintTextColor(0xFF888888);
+        et.setTextColor(0xFF222222);
+        et.setTextSize(14);
+        et.setSingleLine(true);
+        et.setBackgroundColor(0x00000000);
+        if (password) {
+            et.setInputType(android.text.InputType.TYPE_CLASS_TEXT
+                    | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        }
+        Underline.attach(et);
+        return et;
     }
 
     private void doChangePassword(final String oldPw, final String newPw) {
