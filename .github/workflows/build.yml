@@ -71,12 +71,61 @@ jobs:
 
       - name: Write settings.gradle
         run: |
-          printf '%s\n' "pluginManagement {" "    repositories { google(); mavenCentral(); gradlePluginPortal() }" "}" "dependencyResolutionManagement {" "    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)" "    repositories { google(); mavenCentral() }" "}" "rootProject.name = 'chat'" "include ':app'" > settings.gradle
+          cat > settings.gradle <<'EOF'
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+    }
+}
+rootProject.name = 'chat'
+include ':app'
+EOF
           cat settings.gradle
 
       - name: Write root build.gradle
         run: |
-          printf '%s\n' "buildscript {" "    repositories { google(); mavenCentral() }" "    dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }" "}" > build.gradle
+          cat > build.gradle <<'EOF'
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+        // Kotlin 预发布版（如 1.8.20-RC2）只在 JetBrains 自己的仓库里
+        maven { url 'https://maven.pkg.jetbrains.space/kotlin/p/kotlin/bootstrap' }
+        // 兜底镜像
+        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+    }
+    dependencies { classpath 'com.android.tools.build:gradle:8.1.4' }
+    // AGP 8.1.4 会要 kotlin-stdlib-jdk8:1.8.20-RC2，公开仓库没有，统一换成正式版
+    configurations.classpath {
+        resolutionStrategy {
+            eachDependency { d ->
+                if (d.requested.group == 'org.jetbrains.kotlin'
+                        && d.requested.name.startsWith('kotlin-stdlib')) {
+                    d.useVersion '1.8.22'
+                }
+            }
+        }
+    }
+}
+EOF
           cat build.gradle
 
       - name: Write gradle.properties
@@ -133,9 +182,33 @@ jobs:
             exit 1
           fi
 
+      - name: Check repo connectivity
+        run: |
+          # 先看看仓库通不通，方便区分「网络问题」和「代码问题」
+          for u in \
+            https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/8.1.4/gradle-8.1.4.pom \
+            https://repo1.maven.org/maven2/commons-io/commons-io/2.4/commons-io-2.4.pom \
+            https://plugins.gradle.org/m2/ ; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$u" || echo ERR)
+            echo "$code  $u"
+          done
+
       - name: Build Debug APK
         run: |
-          "$GRADLE_HOME/bin/gradle" :app:assembleDebug --stacktrace --no-daemon
+          # 仓库偶发抽风会导致依赖下载 404，这里自动重试 3 次
+          for i in 1 2 3; do
+            echo "===== 第 $i 次尝试 ====="
+            if [ "$i" = "1" ]; then
+              "$GRADLE_HOME/bin/gradle" :app:assembleDebug --stacktrace --no-daemon && exit 0
+            else
+              "$GRADLE_HOME/bin/gradle" :app:assembleDebug --stacktrace --no-daemon \
+                --refresh-dependencies && exit 0
+            fi
+            echo "第 $i 次失败，20 秒后重试"
+            sleep 20
+          done
+          echo "::error::三次尝试都失败。若为依赖下载失败，多为仓库网络波动，稍后在 Actions 里点 Re-run 重试即可。"
+          exit 1
 
       - name: Show APK signature
         run: |
