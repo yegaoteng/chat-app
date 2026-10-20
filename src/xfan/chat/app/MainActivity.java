@@ -170,6 +170,7 @@ public class MainActivity extends Activity {
         };
         tabChat.setOnClickListener(tabClick);
         tabFriends.setOnClickListener(tabClick);
+        tabDownload.setOnClickListener(tabClick);
         tabMe.setOnClickListener(tabClick);
 
         // 每一步单独容错：任何一处异常都不会导致整个页面闪退
@@ -278,6 +279,7 @@ public class MainActivity extends Activity {
         // 标签本身也挂上：选中层压在标签下面，长按标签即等于长按选中层
         attachDockDrag(tabChat);
         attachDockDrag(tabFriends);
+        attachDockDrag(tabDownload);
         attachDockDrag(tabMe);
     }
 
