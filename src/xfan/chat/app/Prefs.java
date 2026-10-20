@@ -73,6 +73,36 @@ public class Prefs {
     /** 手动兑换/购买个性化后调用：下一侧边栏强制刷新 */
     public static void invalidateStyles() { put("styles_ts", "0"); }
 
+    // ---- 好友 / 频道 24 小时缓存 ----
+    // 每次进页面都全量重拉会很慢，而且列表会闪一下。
+    // 缓存 24 小时，只有好友在线状态发生变化时才真正刷新列表。
+
+    public static String friendsJson() { return get("friends_json", ""); }
+
+    public static void friendsJson(String v) { put("friends_json", v); }
+
+    public static long friendsTs() {
+        try { return Long.parseLong(get("friends_ts", "0")); } catch (Exception e) { return 0; }
+    }
+
+    public static void friendsTs(long v) { put("friends_ts", String.valueOf(v)); }
+
+    public static String chansJson() { return get("chans_json", ""); }
+
+    public static void chansJson(String v) { put("chans_json", v); }
+
+    public static long chansTs() {
+        try { return Long.parseLong(get("chans_ts", "0")); } catch (Exception e) { return 0; }
+    }
+
+    public static void chansTs(long v) { put("chans_ts", String.valueOf(v)); }
+
+    /** 手动操作（加好友、退频道、换风格等）后调用，强制下次重新拉取 */
+    public static void invalidateLists() {
+        put("friends_ts", "0");
+        put("chans_ts", "0");
+    }
+
     /** 会话免打扰：接收消息但不发通知。key = mute_<会话标识> */
     public static boolean muted(String target) {
         return "1".equals(get("mute_" + target, "0"));

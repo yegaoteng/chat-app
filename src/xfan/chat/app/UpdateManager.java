@@ -106,7 +106,9 @@ public class UpdateManager {
                 }
 
                 if (!hasUpdate) {
-                    if (manual) toast(act, "已是最新版本（" + localName + "）");
+                    // 需求：每次启动都请求更新并给出反馈，
+                    // 所以静默模式也要提示「已是最新版本」，不再一声不响。
+                    toast(act, "已是最新版本（" + localName + "）");
                     return;
                 }
 
@@ -114,13 +116,11 @@ public class UpdateManager {
                     public void run() {
                         if (url.isEmpty()) {
                             // 有新版本但后台没填下载地址：提示但不给按钮
-                            if (manual) {
-                                new AlertDialog.Builder(act, R.style.XfanDialog)
-                                        .setTitle("发现新版本 " + remoteName)
-                                        .setMessage("服务器已发布新版本，但后台未填写下载地址。")
-                                        .setPositiveButton("知道了", null)
-                                        .show();
-                            }
+                            new AlertDialog.Builder(act, R.style.XfanDialog)
+                                    .setTitle("发现新版本 " + remoteName)
+                                    .setMessage("服务器已发布新版本，但后台未填写下载地址。")
+                                    .setPositiveButton("知道了", null)
+                                    .show();
                             return;
                         }
                         show(act, remoteName, log, url);

@@ -5,6 +5,7 @@
 
     <string name="tab_chat">聊天</string>
     <string name="tab_friends">好友</string>
+    <string name="tab_download">下载</string>
     <string name="tab_me">我的</string>
 
     <string name="hint_server">服务器地址，如 http://example.com/chat</string>

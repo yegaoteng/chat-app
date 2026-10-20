@@ -10,6 +10,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
+import android.widget.TextView;
 
 /** 全屏图片预览：支持双指缩放、拖动，点一下关闭 */
 public class ImageViewActivity extends Activity {
@@ -39,7 +40,31 @@ public class ImageViewActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setBackgroundColor(0xFF000000);
-        root.addView(iv);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.addView(iv, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0, 1f));
+
+        // 底部「保存到相册」：用下载中心断点续传到系统 Download 目录。
+        // 需求要求不弹提示，所以这里静默开始，进度去下载页看。
+        TextView save = new TextView(this);
+        save.setText("保存到相册");
+        save.setTextColor(0xFFFFFFFF);
+        save.setTextSize(15);
+        save.setGravity(android.view.Gravity.CENTER);
+        save.setPadding(0, 26, 0, 26);
+        save.setBackgroundResource(R.drawable.bg_login_btn);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        int m = (int) (12 * getResources().getDisplayMetrics().density);
+        sp.setMargins(m, m, m, m * 2);
+        save.setLayoutParams(sp);
+        save.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { saveToAlbum(url); }
+        });
+        root.addView(save);
+
         setContentView(root);
 
         // 单击关闭：未拖动过才算单击，避免缩放时误关
@@ -133,6 +158,32 @@ public class ImageViewActivity extends Activity {
             return;
         }
         fit2();
+    }
+
+    /** 保存到系统 Download 目录，并通知相册扫描（静默，不弹提示） */
+    private void saveToAlbum(String url) {
+        if (url == null || url.isEmpty()) return;
+        String name = url;
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) name = name.substring(slash + 1);
+        int q = name.indexOf('?');
+        if (q > 0) name = name.substring(0, q);
+        if (name.isEmpty()) name = "image.jpg";
+        Downloads.start(this, url, name);
+        // 下载完成后让相册能扫到。用广播扫描，不需要存储权限。
+        Downloads.setListener(new Downloads.Listener() {
+            public void onChanged() {
+                for (Downloads.Task x : Downloads.all()) {
+                    if (x.state == Downloads.ST_DONE && x.fileExists()) {
+                        try {
+                            android.media.MediaScannerConnection.scanFile(
+                                    ImageViewActivity.this,
+                                    new String[]{x.path}, null, null);
+                        } catch (Throwable ignore) {}
+                    }
+                }
+            }
+        });
     }
 
     private void fit2() {

@@ -33,13 +33,14 @@ public class MainActivity extends Activity {
     private FrameLayout drawerRoot;
     private LinearLayout drawerPanel, drawerBody;
     private TextView tvTitle, tvPoints;
-    private View tabChat, tabFriends, tabMe;
-    private TextView tvChat, tvFriends, tvMe;
-    private ImageView icChat, icFriends, icMe;
+    private View tabChat, tabFriends, tabDownload, tabMe;
+    private TextView tvChat, tvFriends, tvDownload, tvMe;
+    private ImageView icChat, icFriends, icDownload, icMe;
     private View dockIndicator;
     private boolean drawerOpen = false;
 
     public ChatFragment fChat;
+    public DownloadFragment fDownload;
     public FriendsFragment fFriends;
     public MeFragment fMe;
     private int curTab = 0;   // 0 聊天 1 好友 2 我的
@@ -49,7 +50,7 @@ public class MainActivity extends Activity {
      * 现象：切到好友/我的后，聊天页的输入栏偶尔还留在下面。
      */
     private void enforceOnly(int t) {
-        Fragment[] fs = {fChat, fFriends, fMe};
+        Fragment[] fs = {fChat, fFriends, fDownload, fMe};
         for (int i = 0; i < fs.length; i++) {
             Fragment x = fs[i];
             if (x == null || x.getView() == null) continue;
@@ -63,9 +64,9 @@ public class MainActivity extends Activity {
     private void syncDockColors() {
         int on = getResources().getColor(R.color.accent);
         int off = 0xFF000000;   // 未选中用黑色，白底 Dock 上才看得清
-        TextView[] tvs = {tvChat, tvFriends, tvMe};
-        ImageView[] ics = {icChat, icFriends, icMe};
-        for (int i = 0; i < 3; i++) {
+        TextView[] tvs = {tvChat, tvFriends, tvDownload, tvMe};
+        ImageView[] ics = {icChat, icFriends, icDownload, icMe};
+        for (int i = 0; i < 4; i++) {
             boolean sel = (i == curTab);
             if (tvs[i] != null) {
                 tvs[i].setTextColor(sel ? on : off);
@@ -87,6 +88,8 @@ public class MainActivity extends Activity {
     /** 侧边栏文字配色：未选中白、选中蓝 */
     private static final int WHITE_OFF = 0xFFFFFFFF;
     private static final int BLUE_ON   = 0xFF4EA3FF;
+    /** 侧边栏按钮文字统一用天蓝色 */
+    private static final int SKY       = 0xFF38B6FF;
 
     public static MainActivity self;
     /** 是否在前台：后台守护据此决定要不要发通知 */
@@ -129,12 +132,15 @@ public class MainActivity extends Activity {
         tvPoints    = findViewById(R.id.tvPoints);
         tabChat     = findViewById(R.id.tabChat);
         tabFriends  = findViewById(R.id.tabFriends);
+        tabDownload = findViewById(R.id.tabDownload);
         tabMe       = findViewById(R.id.tabMe);
         tvChat      = findViewById(R.id.tvChat);
         tvFriends   = findViewById(R.id.tvFriends);
+        tvDownload  = findViewById(R.id.tvDownload);
         tvMe        = findViewById(R.id.tvMe);
         icChat      = findViewById(R.id.icChat);
         icFriends   = findViewById(R.id.icFriends);
+        icDownload  = findViewById(R.id.icDownload);
         icMe        = findViewById(R.id.icMe);
 
         // 先用本地缓存把右上角填上，别等网络回来才出现（否则看着像缺了一块 UI）
@@ -142,6 +148,7 @@ public class MainActivity extends Activity {
 
         fChat = new ChatFragment();
         fFriends = new FriendsFragment();
+        fDownload = new DownloadFragment();
         fMe = new MeFragment();
         fChat.host = this;
         fFriends.host = this;
@@ -156,7 +163,8 @@ public class MainActivity extends Activity {
 
         View.OnClickListener tabClick = new View.OnClickListener() {
             public void onClick(View v) {
-                int t = (v == tabChat) ? 0 : (v == tabFriends ? 1 : 2);
+                int t = (v == tabChat) ? 0 : (v == tabFriends ? 1
+                        : (v == tabDownload ? 2 : 3));
                 switchTab(t);
             }
         };
@@ -352,7 +360,7 @@ public class MainActivity extends Activity {
 
     /** 手指位置最接近哪一页 */
     private int dockTabAt(float rawX) {
-        View[] tabs = {tabChat, tabFriends, tabMe};
+        View[] tabs = {tabChat, tabFriends, tabDownload, tabMe};
         int best = 0;
         float bestD = Float.MAX_VALUE;
         int[] loc = new int[2];
@@ -369,7 +377,8 @@ public class MainActivity extends Activity {
     /** 让选中层的宽度与某一页一致 */
     private void sizeDockIndicator(int t) {
         final View ind = dockIndicator;
-        View target = (t == 0) ? tabChat : (t == 1 ? tabFriends : tabMe);
+        View target = (t == 0) ? tabChat : (t == 1 ? tabFriends
+                : (t == 2 ? tabDownload : tabMe));
         if (ind == null || target == null) return;
         int w = target.getWidth();
         if (w <= 0) return;
@@ -409,7 +418,8 @@ public class MainActivity extends Activity {
         final int prev = curTab;
         curTab = t;
 
-        Fragment f = (t == 0) ? fChat : (t == 1 ? fFriends : fMe);
+        Fragment f = (t == 0) ? fChat : (t == 1 ? fFriends
+                : (t == 2 ? fDownload : fMe));
         FragmentTransaction ft = getFragmentManager().beginTransaction();
         // 不用 setCustomAnimations：FragmentManager 会用 AnimatorInflater 解析，
         // 而补间动画(<translate>)不是合法 animator，会抛 Unknown animator name。
@@ -418,6 +428,7 @@ public class MainActivity extends Activity {
         try {
             if (fChat.isAdded()) ft.hide(fChat);
             if (fFriends.isAdded()) ft.hide(fFriends);
+            if (fDownload != null && fDownload.isAdded()) ft.hide(fDownload);
             if (fMe.isAdded()) ft.hide(fMe);
             ft.show(f);
             ft.commit();
@@ -438,10 +449,12 @@ public class MainActivity extends Activity {
         enforceOnly(t);
 
         syncDockColors();
-        popTab(t == 0 ? tabChat : (t == 1 ? tabFriends : tabMe));
+        popTab(t == 0 ? tabChat : (t == 1 ? tabFriends : (t == 2 ? tabDownload : tabMe)));
 
         tvTitle.setText(t == 0 ? getString(R.string.tab_chat)
-                : t == 1 ? getString(R.string.tab_friends) : getString(R.string.tab_me));
+                : t == 1 ? getString(R.string.tab_friends)
+                : t == 2 ? getString(R.string.tab_download)
+                : getString(R.string.tab_me));
         syncTopRight(Prefs.points());
         moveDockIndicator(t, true);
 
@@ -449,7 +462,8 @@ public class MainActivity extends Activity {
 
         if (t == 0) safeShow(fChat);
         if (t == 1) safeShow(fFriends);
-        if (t == 2) safeShow(fMe);
+        if (t == 2) safeShow(fDownload);
+        if (t == 3) safeShow(fMe);
     }
 
     /** fragment 可能尚未完成 add，延后一帧再回调，避免空指针 */
@@ -460,6 +474,7 @@ public class MainActivity extends Activity {
                 try {
                     if (f instanceof ChatFragment) ((ChatFragment) f).onShow();
                     else if (f instanceof FriendsFragment) ((FriendsFragment) f).onShow();
+                    else if (f instanceof DownloadFragment) ((DownloadFragment) f).onShow();
                     else if (f instanceof MeFragment) ((MeFragment) f).onShow();
                 } catch (Exception ignore) {}
             }
@@ -507,7 +522,15 @@ public class MainActivity extends Activity {
         } catch (Throwable ignore) {}
     }
 
-    public void gotoChat() { switchTab(0); }
+    /**
+     * 切到聊天页。
+     * 只在当前就停在聊天页时才真正切换 ——
+     * 之前无条件 switchTab(0)，于是「聊天数据加载中我切到了我的页」，
+     * 加载完又把自己弹回聊天页，非常打断操作。
+     */
+    public void gotoChat() {
+        if (curTab == 0) switchTab(0);
+    }
 
     public void tvTitleSet(final String s) {
         ui(new Runnable() {
@@ -686,6 +709,36 @@ public class MainActivity extends Activity {
         Glass.apply(v, true, 8f);
     }
 
+    /**
+     * 侧边栏按钮：改用登录页按钮那套外观（圆角灰底 + 白细边 + 按压态）。
+     * 之前用 Glass 自绘的深色玻璃底，跟登录页风格不统一。
+     */
+    private void asLoginBtn(View v, boolean on) {
+        try {
+            v.setBackgroundResource(on ? R.drawable.bg_login_btn_on
+                                       : R.drawable.bg_login_btn);
+        } catch (Throwable ignore) {}
+        try { v.setMinimumHeight(dp(44)); } catch (Throwable ignore) {}
+    }
+
+    /** 侧边栏按钮标准内边距：左右各比原来多 2dp（整体宽 +4dp） */
+    private void padDrawerBtn(TextView t) {
+        t.setPadding(dp(20), dp(16), dp(20), dp(16));
+    }
+
+    private int dp(float v) {
+        return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /** 侧边栏按钮之间的间距（比原来 +2dp） */
+    private LinearLayout.LayoutParams drawerBtnLp() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = dp(14);
+        return lp;
+    }
+
     private TextView sectionTitle(String s) {
         TextView t = new TextView(this);
         t.setText(s);
@@ -727,12 +780,12 @@ public class MainActivity extends Activity {
         final TextView btn = new TextView(this);
         // 已签到就显示「今日已签到」，不再让人误以为还能再点一次
         btn.setText(Prefs.get("signed_today", "0").equals("1") ? "今日已签到" : "每日签到 (+50)");
-        btn.setTextColor(WHITE_OFF);
+        btn.setTextColor(SKY);
         btn.setTextSize(15);
-        btn.setPadding(18, 16, 18, 16);
+        padDrawerBtn(btn);
         btn.setLayoutParams(new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        asButton(btn);
+        asLoginBtn(btn, false);
 
         final ProgressBar pb = new ProgressBar(this);
         pb.setVisibility(View.GONE);
@@ -785,10 +838,11 @@ public class MainActivity extends Activity {
 
         TextView btn = new TextView(this);
         btn.setText("兑换");
-        btn.setTextColor(WHITE_OFF);
+        btn.setTextColor(SKY);
         btn.setTextSize(15);
-        btn.setPadding(18, 16, 18, 16);
-        asButton(btn);
+        padDrawerBtn(btn);
+        asLoginBtn(btn, false);
+        btn.setLayoutParams(drawerBtnLp());
         btn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 final String code = ed.getText().toString().trim();
@@ -872,22 +926,18 @@ public class MainActivity extends Activity {
 
             TextView row = new TextView(this);
             String label = it.optString("name", key);
-            if (!has && price > 0) label += "（" + price + " 分）";
+            if (!has && price > 0) label += "（" + price + " 积分）";
             if (key.equals(cur)) label += "  ✓";
             row.setText(label);
             final boolean on = key.equals(cur);
             // 未选中白色，选中蓝色（侧边栏底板是深色，白色才看得清）
-            row.setTextColor(on ? BLUE_ON : WHITE_OFF);
+            // 需求：侧边栏文字保持天蓝色（不再用白色），选中靠描边区分
+            row.setTextColor(SKY);
             row.setTextSize(15);
-            row.setPadding(18, 16, 18, 16);
-            if (on) asButtonOn(row); else asButton(row);
+            padDrawerBtn(row);
+            asLoginBtn(row, on);
             markStyle(row, kind);
-            // 项间距再放大一点
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = 12;
-            row.setLayoutParams(lp);
+            row.setLayoutParams(drawerBtnLp());
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { setStyle(kind, key, has, price); }
             });

@@ -396,7 +396,8 @@ public class LoginActivity extends Activity {
         hide(edInvite, 80);
         btnLogin.setText(R.string.btn_login);
         btnRegister.setText(R.string.btn_register);
-        tvTip.setText("");
+        // 之前这里清空了提示，导致「跳到注册页再回来」后底部说明消失
+        tvTip.setText(R.string.web_login_tip);
     }
 
     /**

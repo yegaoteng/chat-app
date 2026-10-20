@@ -222,7 +222,7 @@ public class FriendsFragment extends Fragment {
                             return;
                         }
                         toast(r.optBoolean("pinned", false) ? "已置顶" : "已取消置顶");
-                        loadChannels();
+                        Prefs.invalidateLists(); loadChannels();
                     }
                 });
             }
@@ -256,7 +256,7 @@ public class FriendsFragment extends Fragment {
                             return;
                         }
                         toast("已退出频道");
-                        loadChannels();
+                        Prefs.invalidateLists(); loadChannels();
                     }
                 });
             }
@@ -296,6 +296,7 @@ public class FriendsFragment extends Fragment {
 
     // ---------- 数据 ----------
     private void load() {
+        // 这里不能失效缓存：正常进入页面就该优先用 24 小时缓存
         loadChannels();
         loadFriends();
     }
@@ -320,7 +321,20 @@ public class FriendsFragment extends Fragment {
                     android.widget.Toast.LENGTH_LONG).show();
     }
 
+    /** 缓存有效期：24 小时 */
+    private static final long CACHE_MS = 24L * 3600 * 1000;
+
+    private boolean cacheFresh(long ts) {
+        return ts > 0 && (System.currentTimeMillis() - ts < CACHE_MS);
+    }
+
     private void loadChannels() {
+        // 24 小时内直接用缓存渲染，不再走网络
+        String cached = Prefs.chansJson();
+        if (!cached.isEmpty() && cacheFresh(Prefs.chansTs())) {
+            try { applyChannels(new JSONArray(cached)); } catch (Throwable ignore) {}
+            return;
+        }
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=my_channels");
@@ -330,57 +344,142 @@ public class FriendsFragment extends Fragment {
                         if (r == null || !r.optBoolean("success", false)) { why(r); return; }
                         JSONArray arr = r.optJSONArray("channels");
                         if (arr == null) return;
-                        chans.clear();
-                        for (int i = 0; i < arr.length(); i++) {
-                            JSONObject o = arr.optJSONObject(i);
-                            if (o == null) continue;
-                            Models.Channel c = new Models.Channel();
-                            c.code = o.optString("code", "");
-                            c.name = o.optString("name", c.code);
-                            c.lastTs = o.optLong("last_ts", 0);
-                            c.pinned = o.optBoolean("pinned", false);
-                            chans.add(c);
-                        }
-                        chAd.notifyDataSetChanged();
-                        setLvHeight(lvChannel, chans.size());
+                        Prefs.chansJson(arr.toString());
+                        Prefs.chansTs(System.currentTimeMillis());
+                        applyChannels(arr);
                     }
                 });
             }
         }).start();
     }
 
+    private void applyChannels(JSONArray arr) {
+        chans.clear();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            Models.Channel c = new Models.Channel();
+            c.code = o.optString("code", "");
+            c.name = o.optString("name", c.code);
+            c.lastTs = o.optLong("last_ts", 0);
+            c.pinned = o.optBoolean("pinned", false);
+            chans.add(c);
+        }
+        chAd.notifyDataSetChanged();
+        setLvHeight(lvChannel, chans.size());
+    }
+
     private void loadFriends() {
+        // 缓存新鲜时：立刻用缓存渲染（不转圈），再静默查一次在线状态，
+        // 只有在线状态真的变了才刷新列表。
+        String cached = Prefs.friendsJson();
+        if (!cached.isEmpty() && cacheFresh(Prefs.friendsTs())) {
+            try { applyFriends(new JSONArray(cached)); } catch (Throwable ignore) {}
+            refreshOnlineOnly();
+            return;
+        }
         showLoading(true);
+        loadFriendsNet(true);
+    }
+
+    /** 只关心「谁在线」：签名没变就不动 UI，避免列表无谓闪烁 */
+    private void refreshOnlineOnly() {
+        new Thread(new Runnable() {
+            public void run() {
+                final JSONObject r = Api.get("user.php?action=friends");
+                if (getActivity() == null || r == null) return;
+                if (!r.optBoolean("success", false)) return;
+                final JSONArray arr = r.optJSONArray("friends");
+                if (arr == null) return;
+                final String now = onlineSign(arr);
+                getActivity().runOnUiThread(new Runnable() {
+                    public void run() {
+                        // 在线状态（或好友增减）有变化才更新
+                        if (!now.equals(onlineSign(friendsToJson()))) {
+                            Prefs.friendsJson(arr.toString());
+                            Prefs.friendsTs(System.currentTimeMillis());
+                            applyFriends(arr);
+                        }
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** 用「用户名:是否在线」拼出签名，用来判断有没有实质变化 */
+    private String onlineSign(JSONArray arr) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            b.append(o.optString("username", ""))
+             .append(':')
+             .append(o.optBoolean("online", false) ? 1 : 0)
+             .append('|');
+        }
+        return b.toString();
+    }
+
+    private JSONArray friendsToJson() {
+        JSONArray a = new JSONArray();
+        for (Models.Friend f : friends) {
+            JSONObject o = new JSONObject();
+            try {
+                o.put("username", f.username);
+                o.put("online", f.online);
+            } catch (Exception ignore) {}
+            a.put(o);
+        }
+        return a;
+    }
+
+    private void loadFriendsNet(final boolean showBar) {
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.get("user.php?action=friends");
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
-                        showLoading(false);
-                        if (r == null || !r.optBoolean("success", false)) { why(r); return; }
+                        if (showBar) showLoading(false);
+                        if (r == null || !r.optBoolean("success", false)) {
+                            // 网络失败但有缓存：退回缓存，至少列表不空
+                            String old = Prefs.friendsJson();
+                            if (!old.isEmpty()) {
+                                try { applyFriends(new JSONArray(old)); }
+                                catch (Throwable ignore) {}
+                                return;
+                            }
+                            why(r);
+                            return;
+                        }
                         JSONArray arr = r.optJSONArray("friends");
                         if (arr == null) return;
-                        friends.clear();
-                        for (int i = 0; i < arr.length(); i++) {
-                            JSONObject o = arr.optJSONObject(i);
-                            if (o == null) continue;
-                            Models.Friend f = new Models.Friend();
-                            f.username = o.optString("username", "");
-                            f.avatar = o.optString("avatar", "");
-                            f.namecolor = o.optString("namecolor", "default");
-                            f.online = o.optBoolean("online", false);
-                            f.last = o.optString("last", "");
-                            f.lastTs = o.optLong("last_ts", 0);
-                            f.unread = o.optInt("unread", 0);
-                            f.pinned = o.optBoolean("pinned", false);
-                            friends.add(f);
-                        }
-                        frAd.notifyDataSetChanged();
+                        Prefs.friendsJson(arr.toString());
+                        Prefs.friendsTs(System.currentTimeMillis());
+                        applyFriends(arr);
                     }
                 });
             }
         }).start();
+    }
+
+    private void applyFriends(JSONArray arr) {
+        friends.clear();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            Models.Friend f = new Models.Friend();
+            f.username = o.optString("username", "");
+            f.avatar = o.optString("avatar", "");
+            f.namecolor = o.optString("namecolor", "default");
+            f.online = o.optBoolean("online", false);
+            f.last = o.optString("last", "");
+            f.lastTs = o.optLong("last_ts", 0);
+            f.unread = o.optInt("unread", 0);
+            f.pinned = o.optBoolean("pinned", false);
+            friends.add(f);
+        }
+        frAd.notifyDataSetChanged();
     }
 
     private void setLvHeight(ListView lv, int n) {
@@ -395,6 +494,7 @@ public class FriendsFragment extends Fragment {
     /** 个性化切换后重新拉取，让新名称色立刻生效 */
     public void reloadForStyleChange() {
         try {
+            Prefs.invalidateLists();
             loadFriends();
             loadChannels();
         } catch (Throwable ignore) {}
@@ -459,7 +559,7 @@ public class FriendsFragment extends Fragment {
                 getActivity().runOnUiThread(new Runnable() {
                     public void run() {
                         toast(r != null && r.optBoolean("success", false) ? "已删除" : "删除失败");
-                        loadFriends();
+                        Prefs.invalidateLists(); loadFriends();
                     }
                 });
             }
@@ -474,7 +574,7 @@ public class FriendsFragment extends Fragment {
                 final JSONObject r = Api.post("user.php?action=friend_pin", b);
                 if (getActivity() == null) return;
                 getActivity().runOnUiThread(new Runnable() {
-                    public void run() { loadFriends(); }
+                    public void run() { Prefs.invalidateLists(); loadFriends(); }
                 });
             }
         }).start();
@@ -610,7 +710,7 @@ public class FriendsFragment extends Fragment {
                         toast(r != null && r.optBoolean("success", false)
                                 ? (accept ? "已同意" : "已拒绝")
                                 : (r == null ? "网络错误" : r.optString("error", "失败")));
-                        loadFriends();
+                        Prefs.invalidateLists(); loadFriends();
                     }
                 });
             }
@@ -640,7 +740,7 @@ public class FriendsFragment extends Fragment {
                                     public void run() {
                                         toast(r != null && r.optBoolean("success", false)
                                                 ? "已加入" : (r == null ? "网络错误" : r.optString("error", "失败")));
-                                        loadChannels();
+                                        Prefs.invalidateLists(); loadChannels();
                                     }
                                 });
                             }

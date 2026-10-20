@@ -28,6 +28,9 @@ public class MeFragment extends Fragment {
     private ImageView ivAvatar;
     private TextView tvName, tvBio, tvPts, tvVer, tvUid;
     private Button btnSign, btnInvite, btnBio, btnRename, btnAvatar, btnLogout, btnUpdate;
+    private Button btnProjects, btnMcServer;
+    private View boxProjects;
+    private boolean projectsOpen = false;
     private Button btnDisplay;
     private Button btnProfileToggle, btnPassword;
     private LinearLayout boxProfile;
@@ -60,6 +63,24 @@ public class MeFragment extends Fragment {
         btnAvatar = v.findViewById(R.id.btnAvatar);
         btnLogout = v.findViewById(R.id.btnLogout);
         btnUpdate = v.findViewById(R.id.btnUpdate);
+        btnProjects = v.findViewById(R.id.btnProjects);
+        boxProjects = v.findViewById(R.id.boxProjects);
+        btnMcServer = v.findViewById(R.id.btnMcServer);
+        if (btnProjects != null && boxProjects != null) {
+            btnProjects.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v2) { toggleProjects(); }
+            });
+        }
+        if (btnMcServer != null) {
+            btnMcServer.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v2) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://mc.xfan.l.cd")));
+                    } catch (Throwable ignore) { toast("无法打开网页"); }
+                }
+            });
+        }
         btnDisplay = v.findViewById(R.id.btnDisplay);
         pbUpdate  = v.findViewById(R.id.pbUpdate);
         btnProfileToggle = v.findViewById(R.id.btnProfileToggle);
@@ -253,6 +274,50 @@ public class MeFragment extends Fragment {
             if (tvBio != null) tvBio.setTextColor(ThemeEngine.themeTextSub());
             if (tvPts != null) tvPts.setTextColor(ThemeEngine.themeTextSub());
         } catch (Exception ignore) {}
+    }
+
+    /** 展开 / 收起「旗下项目」，带高度过渡动画 */
+    private void toggleProjects() {
+        if (boxProjects == null || btnProjects == null) return;
+        projectsOpen = !projectsOpen;
+        btnProjects.setText(projectsOpen ? "旗下项目  ▾" : "旗下项目  ▸");
+
+        boxProjects.setVisibility(View.VISIBLE);
+        boxProjects.measure(
+                View.MeasureSpec.makeMeasureSpec(
+                        ((View) boxProjects.getParent()).getWidth(),
+                        View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        final int target = boxProjects.getMeasuredHeight();
+        final int start = projectsOpen ? 0 : target;
+        final int end = projectsOpen ? target : 0;
+
+        android.animation.ValueAnimator va =
+                android.animation.ValueAnimator.ofInt(start, end);
+        va.setDuration(260);
+        va.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        va.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
+            public void onAnimationUpdate(android.animation.ValueAnimator a) {
+                android.view.ViewGroup.LayoutParams lp = boxProjects.getLayoutParams();
+                if (lp == null) return;
+                lp.height = (Integer) a.getAnimatedValue();
+                boxProjects.setLayoutParams(lp);
+            }
+        });
+        va.addListener(new android.animation.Animator.AnimatorListener() {
+            public void onAnimationStart(android.animation.Animator a) {}
+            public void onAnimationEnd(android.animation.Animator a) {
+                if (!projectsOpen) boxProjects.setVisibility(View.GONE);
+                android.view.ViewGroup.LayoutParams lp = boxProjects.getLayoutParams();
+                if (lp != null) {
+                    lp.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+                    boxProjects.setLayoutParams(lp);
+                }
+            }
+            public void onAnimationCancel(android.animation.Animator a) {}
+            public void onAnimationRepeat(android.animation.Animator a) {}
+        });
+        try { va.start(); } catch (Throwable ignore) {}
     }
 
     /** 展开 / 收起「修改个人资料」，带高度过渡动画 */

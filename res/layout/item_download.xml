@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 一条下载任务：名称 + 进度条 + 速度 + 操作按钮 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <TextView
+        android:id="@+id/tvName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="middle"
+        android:singleLine="true"
+        android:textColor="#FF222222"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:textColor="#FF777777"
+        android:textSize="12sp" />
+
+    <ProgressBar
+        android:id="@+id/pb"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="6dp"
+        android:max="100" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/btnToggle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_login_btn"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="暂停"
+            android:textColor="@color/sky"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
+        <TextView
+            android:id="@+id/btnRemove"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_login_btn"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="删除"
+            android:textColor="@color/sky"
+            android:textSize="13sp" />
+    </LinearLayout>
+</LinearLayout>

@@ -37,5 +37,7 @@ public class App extends Application {
         // 兜底唤醒：进程被杀后由系统周期性重新拉起（约 15 分钟一次），
         // 这样即使用户没打开 App 也能收到新消息通知。
         try { MonitorJob.schedule(this); } catch (Throwable ignore) {}
+        // 恢复下载历史（退出时还在跑的任务会变成暂停，不会偷偷占流量）
+        try { Downloads.restore(); } catch (Throwable ignore) {}
     }
 }

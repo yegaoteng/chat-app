@@ -169,6 +169,35 @@
             android:textColor="@color/text"
             android:textSize="14sp" />
 
+        <!-- 旗下项目：展开栏，展开后出现「Mc公益服」 -->
+        <Button
+            android:id="@+id/btnProjects"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_card"
+            android:text="旗下项目  ▸"
+            android:textColor="@color/text"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/boxProjects"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btnMcServer"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_card"
+                android:text="Mc公益服"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+        </LinearLayout>
+
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="44dp"

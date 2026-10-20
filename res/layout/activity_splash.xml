@@ -16,6 +16,14 @@
     android:layout_height="match_parent"
     android:background="#FF0D0D16">
 
+    <!-- 开屏视频：assets 里有 splash.mp4 时优先播视频，播完才进登录页 -->
+    <VideoView
+        android:id="@+id/vvSplash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
     <ImageView
         android:id="@+id/ivSplash"
         android:layout_width="match_parent"

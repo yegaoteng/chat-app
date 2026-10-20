@@ -12,6 +12,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import java.io.InputStream;
+import android.widget.VideoView;
 
 /** 开屏画面。 */
 public class SplashActivity extends Activity {
@@ -36,11 +37,83 @@ public class SplashActivity extends Activity {
             return;
         }
 
-        try { showSplash(); } catch (Throwable ignore) {}
+        // 优先播视频：有 splash.mp4 就等它播完再进，否则走图片 + 定时
+        if (!showSplashVideo()) {
+            try { showSplash(); } catch (Throwable ignore) {}
+            new Handler().postDelayed(new Runnable() {
+                public void run() { finishGo(); }
+            }, SPLASH_MS);
+        }
+    }
 
-        new Handler().postDelayed(new Runnable() {
-            public void run() { finishGo(); }
-        }, SPLASH_MS);
+    /**
+     * 开屏视频：assets/splash.mp4。
+     * 播放完（或出错）才进入下一步，保证视频完整播完。
+     * 返回 true 表示已接管，调用方不要再走定时逻辑。
+     */
+    private boolean showSplashVideo() {
+        VideoView vv = null;
+        try { vv = findViewById(R.id.vvSplash); } catch (Throwable ignore) {}
+        if (vv == null) return false;
+
+        String hit = null;
+        try {
+            android.content.res.AssetManager am = getAssets();
+            String[] all = am.list("");
+            if (all != null) {
+                for (String f : all) {
+                    if (f.equalsIgnoreCase("splash.mp4")
+                            || f.equalsIgnoreCase("splash.webm")
+                            || f.equalsIgnoreCase("splash.3gp")) { hit = f; break; }
+                }
+            }
+        } catch (Throwable ignore) {}
+        if (hit == null) return false;
+
+        try {
+            // VideoView 只能播文件路径，先把 assets 里的视频拷到本地
+            java.io.File f = new java.io.File(getFilesDir(), "splash_video.mp4");
+            if (!f.exists() || f.length() == 0) {
+                java.io.InputStream in = getAssets().open(hit);
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) fos.write(buf, 0, n);
+                fos.close();
+                in.close();
+            }
+
+            final VideoView fv = vv;
+            fv.setVisibility(View.VISIBLE);
+            fv.setVideoPath(f.getAbsolutePath());
+            fv.setOnPreparedListener(new android.media.MediaPlayer.OnPreparedListener() {
+                public void onPrepared(android.media.MediaPlayer mp) {
+                    try {
+                        mp.setLooping(false);
+                        mp.setVideoScalingMode(
+                                android.media.MediaPlayer
+                                        .VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING);
+                        // 开屏视频按需求开启声音
+                        mp.setVolume(1f, 1f);
+                    } catch (Throwable ignore) {}
+                    fv.start();
+                }
+            });
+            // 播完才进登录页
+            fv.setOnCompletionListener(new android.media.MediaPlayer.OnCompletionListener() {
+                public void onCompletion(android.media.MediaPlayer mp) { finishGo(); }
+            });
+            // 出错也要进，不能卡在开屏
+            fv.setOnErrorListener(new android.media.MediaPlayer.OnErrorListener() {
+                public boolean onError(android.media.MediaPlayer mp, int what, int extra) {
+                    finishGo();
+                    return true;
+                }
+            });
+            return true;
+        } catch (Throwable ignore) {
+            return false;
+        }
     }
 
     /** 载入开屏图：只从 assets 读（支持 jpg / png / webp）。 */
