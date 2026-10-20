@@ -395,7 +395,8 @@ public class MainActivity extends Activity {
 
     private void moveDockIndicator(int t, boolean animate) {
         final View ind = dockIndicator;
-        View target = (t == 0) ? tabChat : (t == 1 ? tabFriends : tabMe);
+        View target = (t == 0) ? tabChat : (t == 1 ? tabFriends
+                : (t == 2 ? tabDownload : tabMe));
         if (ind == null || target == null) return;
         sizeDockIndicator(t);
         int pad = Glass.dp(this, 5);
