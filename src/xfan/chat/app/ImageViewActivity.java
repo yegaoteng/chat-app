@@ -170,6 +170,8 @@ public class ImageViewActivity extends Activity {
         if (q > 0) name = name.substring(0, q);
         if (name.isEmpty()) name = "image.jpg";
         Downloads.start(this, url, name);
+        android.widget.Toast.makeText(this, "图片已开始下载，请前往下载页查看",
+                android.widget.Toast.LENGTH_SHORT).show();
         // 下载完成后让相册能扫到。用广播扫描，不需要存储权限。
         Downloads.setListener(new Downloads.Listener() {
             public void onChanged() {

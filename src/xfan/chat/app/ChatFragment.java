@@ -246,7 +246,14 @@ public class ChatFragment extends Fragment {
     }
 
     // ---------- 会话切换 ----------
-    public void openChannel(String code, String name) {
+    public void openChannel(String code, String name) { openChannel(code, name, true); }
+
+    /**
+     * @param jump 是否切到聊天页。
+     *   用户主动点好友/频道 -> true（要跳）
+     *   登录后自动打开默认会话 -> false（别打断用户当前所在页）
+     */
+    public void openChannel(String code, String name, boolean jump) {
         mode = "channel";
         channelCode = code;
         loadChatBg();
@@ -256,10 +263,16 @@ public class ChatFragment extends Fragment {
         reset();
         showLoading(true);
         loadHistory();
-        if (host != null) { host.gotoChat(); host.tvTitleSet(name); }
+        if (host != null) {
+            if (jump) host.gotoChat();
+            host.tvTitleSet(name);
+        }
     }
 
-    public void openPm(String who) {
+    public void openPm(String who) { openPm(who, true); }
+
+    /** @param jump 同 openChannel：用户主动点击才跳到聊天页 */
+    public void openPm(String who, boolean jump) {
         mode = "pm";
         peer = who;
         channelCode = "";
@@ -268,7 +281,10 @@ public class ChatFragment extends Fragment {
         reset();
         showLoading(true);
         loadHistory();
-        if (host != null) { host.gotoChat(); host.tvTitleSet("与 " + who + " 私聊"); }
+        if (host != null) {
+            if (jump) host.gotoChat();
+            host.tvTitleSet("与 " + who + " 私聊");
+        }
     }
 
     private void reset() {
@@ -285,7 +301,7 @@ public class ChatFragment extends Fragment {
             JSONArray chs = r.optJSONArray("channels");
             if (chs != null && chs.length() > 0) {
                 String first = String.valueOf(chs.opt(0));
-                openChannel(first, "频道 " + first);
+                openChannel(first, "频道 " + first, false);
             }
         }
         applyTheme();
@@ -652,21 +668,136 @@ public class ChatFragment extends Fragment {
                 .show();
     }
 
+    /**
+     * 上传并发送：全程用一个弹窗显示进度。
+     * 阶段一「正在连接服务器」→ 阶段二 进度条 → 完成后不自动关，
+     * 显示「已完成」按钮，点了才关（这样能看清最终结果）。
+     */
     private void uploadAndSend(final String path) {
+        if (getActivity() == null) return;
         final File f = new File(path);
-        toast("上传中…");
+        final long total = f.length();
+
+        android.content.Context ctx = getActivity();
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (20 * ctx.getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad, pad, pad / 2);
+
+        final TextView tvStage = new TextView(ctx);
+        tvStage.setText("正在连接服务器…");
+        tvStage.setTextSize(14);
+        tvStage.setTextColor(ThemeEngine.themeText());
+
+        final ProgressBar pb = new ProgressBar(ctx, null,
+                android.R.attr.progressBarStyleHorizontal);
+        pb.setMax(100);
+        pb.setProgress(0);
+        pb.setVisibility(View.GONE);
+        LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (int) (8 * ctx.getResources().getDisplayMetrics().density));
+        plp.topMargin = (int) (12 * ctx.getResources().getDisplayMetrics().density);
+        pb.setLayoutParams(plp);
+
+        final TextView tvNum = new TextView(ctx);
+        tvNum.setTextSize(12);
+        tvNum.setTextColor(ThemeEngine.themeTextSub());
+        tvNum.setVisibility(View.GONE);
+
+        box.addView(tvStage);
+        box.addView(pb);
+        box.addView(tvNum);
+
+        // 完成后才出现的「已完成」按钮（放在弹窗内容里，不在按钮栏）
+        final TextView btnDone = new TextView(ctx);
+        btnDone.setText("已完成");
+        btnDone.setTextSize(15);
+        btnDone.setGravity(android.view.Gravity.CENTER);
+        btnDone.setPadding(0, (int) (14 * ctx.getResources().getDisplayMetrics().density),
+                0, (int) (14 * ctx.getResources().getDisplayMetrics().density));
+        btnDone.setBackgroundResource(R.drawable.bg_login_btn);
+        btnDone.setTextColor(ctx.getResources().getColor(R.color.sky));
+        btnDone.setVisibility(View.GONE);
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        dlp.topMargin = (int) (14 * ctx.getResources().getDisplayMetrics().density);
+        btnDone.setLayoutParams(dlp);
+        box.addView(btnDone);
+
+        // 空按钮栏：完成后把「已完成」以外的按钮都去掉，避免误点关闭
+        final AlertDialog dlg = new AlertDialog.Builder(getActivity(), R.style.XfanDialog)
+                .setTitle("上传图片")
+                .setView(box)
+                .setCancelable(false)
+                .show();
+        // 先把按钮栏整个隐藏，等需要时再显示
+        try {
+            dlg.getButton(AlertDialog.BUTTON_POSITIVE).setVisibility(View.GONE);
+            dlg.getButton(AlertDialog.BUTTON_NEGATIVE).setVisibility(View.GONE);
+            dlg.getButton(AlertDialog.BUTTON_NEUTRAL).setVisibility(View.GONE);
+        } catch (Throwable ignore) {}
+
+        btnDone.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                try { dlg.dismiss(); } catch (Throwable ignore) {}
+            }
+        });
+
+        final Api.Progress pg = new Api.Progress() {
+            public void onConnected() {
+                ui(new Runnable() {
+                    public void run() {
+                        tvStage.setText("正在上传…");
+                        pb.setVisibility(View.VISIBLE);
+                        tvNum.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+
+            public void onProgress(final long done, final long t) {
+                ui(new Runnable() {
+                    public void run() {
+                        int pct = (t > 0) ? (int) (done * 100L / t) : 0;
+                        if (pct > 100) pct = 100;
+                        pb.setProgress(pct);
+                        tvNum.setText(pct + "%  "
+                                + String.format("%.1f", done / 1024.0) + " KB / "
+                                + String.format("%.1f", (t > 0 ? t : total) / 1024.0) + " KB");
+                    }
+                });
+            }
+        };
+
         new Thread(new Runnable() {
             public void run() {
                 final JSONObject r = Api.upload("file.php?action=upload", f, "image",
-                        new HashMap<String, String>());
+                        new HashMap<String, String>(), pg);
                 ui(new Runnable() {
                     public void run() {
-                        if (r == null) { toast("上传失败（可能是服务器拦截了上传请求）"); return; }
-                        if (!r.optBoolean("success", false)) {
-                            toast(r.optString("error", "上传失败"));
+                        if (r == null) {
+                            tvStage.setText("连接错误：上传失败\n"
+                                    + "可能是服务器拦截了上传请求");
+                            pb.setVisibility(View.GONE);
+                            tvNum.setVisibility(View.GONE);
+                            btnDone.setText("关闭");
+                            btnDone.setVisibility(View.VISIBLE);
                             return;
                         }
-                        toast("上传完成，消耗 " + r.optInt("cost", 0) + " 积分");
+                        if (!r.optBoolean("success", false)) {
+                            tvStage.setText("上传失败：" + r.optString("error", "未知错误"));
+                            pb.setVisibility(View.GONE);
+                            tvNum.setVisibility(View.GONE);
+                            btnDone.setText("关闭");
+                            btnDone.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        pb.setProgress(100);
+                        tvNum.setText("100%  上传完成");
+                        tvStage.setText("上传完成，消耗 " + r.optInt("cost", 0) + " 积分");
+                        btnDone.setText("已完成");
+                        btnDone.setVisibility(View.VISIBLE);
                         doSend(r.optString("url", ""), "image",
                                 r.optString("filename", ""), r.optInt("size", 0));
                     }

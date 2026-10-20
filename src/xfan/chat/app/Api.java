@@ -249,7 +249,23 @@ public class Api {
     }
 
     /** multipart 上传（表单字段 file + type），额外字段用 extra */
+    /** 上传进度回调。total 为 -1 表示拿不到总长度（此时按字节数显示）。 */
+    public interface Progress {
+        /** @param done  已写入字节数 */
+        /** @param total 总字节数（文件部分的长度），-1 表示未知 */
+        void onProgress(long done, long total);
+
+        /** 真正开始往网络写之前回调（此时还没拿到响应） */
+        void onConnected();
+    }
+
     public static JSONObject upload(String path, File file, String type, Map<String, String> extra) {
+        return upload(path, file, type, extra, null);
+    }
+
+    /** 带进度回调的上传 */
+    public static JSONObject upload(final String path, File file, String type,
+                                   Map<String, String> extra, final Progress pg) {
         final String BOUND = "----XFAN" + System.currentTimeMillis();
         try {
             HttpURLConnection c = conn(abs(path), "POST");
@@ -280,12 +296,23 @@ public class Api {
             w(dos, "Content-Disposition: form-data; name=\"" + field
                     + "\"; filename=\"" + file.getName() + "\"\r\n");
             w(dos, "Content-Type: application/octet-stream\r\n\r\n");
+            if (pg != null) {
+                try { pg.onConnected(); } catch (Throwable ignore) {}
+            }
+            final long total = file.length();
             FileInputStream fis = new FileInputStream(file);
             byte[] buf = new byte[8192];
             int n;
-            while ((n = fis.read(buf)) > 0) dos.write(buf, 0, n);
+            long sent = 0;
+            while ((n = fis.read(buf)) > 0) {
+                dos.write(buf, 0, n);
+                sent += n;
+                if (pg != null) {
+                    try { pg.onProgress(sent, total); } catch (Throwable ignore) {}
+                }
+            }
             fis.close();
-            dos.writeBytes("\r\n--" + BOUND + "--\r\n");
+            w(dos, "\r\n--" + BOUND + "--\r\n");
             dos.flush();
             dos.close();
 

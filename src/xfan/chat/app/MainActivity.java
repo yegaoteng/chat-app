@@ -527,13 +527,10 @@ public class MainActivity extends Activity {
 
     /**
      * 切到聊天页。
-     * 只在当前就停在聊天页时才真正切换 ——
-     * 之前无条件 switchTab(0)，于是「聊天数据加载中我切到了我的页」，
-     * 加载完又把自己弹回聊天页，非常打断操作。
+     * 由用户主动触发（点好友 / 点频道）时调用；
+     * 登录后自动打开默认会话不调它，避免把用户从当前页弹走。
      */
-    public void gotoChat() {
-        if (curTab == 0) switchTab(0);
-    }
+    public void gotoChat() { switchTab(0); }
 
     public void tvTitleSet(final String s) {
         ui(new Runnable() {
